@@ -3,10 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 // This route runs server-side only, once a day, triggered by Vercel Cron (see vercel.json).
 // It uses the SERVICE ROLE key — not the public anon key — because it needs to read
 // across every organization's documents, which normal RLS policies deliberately block.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+//
+// The client is created INSIDE the handler (not at module load time) so the app can still
+// build and deploy even before SUPABASE_SERVICE_ROLE_KEY is configured in Vercel — reminders
+// simply won't send until that env variable is added, but nothing else breaks in the meantime.
 
 const THRESHOLDS = [90, 60, 45, 30, 15, 7, 1];
 
@@ -16,6 +16,15 @@ export async function GET(request) {
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.RESEND_API_KEY) {
+    return Response.json({ skipped: true, reason: "Reminder env variables not configured yet — see DEPLOYMENT_GUIDE.md section 8." });
+  }
+
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
