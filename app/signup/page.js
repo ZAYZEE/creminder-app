@@ -1,10 +1,18 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ShieldCheck } from "lucide-react";
 
-export default function Signup() {
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <Signup />
+    </Suspense>
+  );
+}
+
+function Signup() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteCode = searchParams.get("invite"); // e.g. /signup?invite=abc123
