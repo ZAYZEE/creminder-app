@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Shell } from "../components";
-import { PlusCircle, X, Mail, Users, Copy, Check } from "lucide-react";
+import { PlusCircle, X, Mail, Users, Copy, Check, ShieldAlert } from "lucide-react";
 
 export default function Settings() {
   const router = useRouter();
   const [org, setOrg] = useState(null);
   const [email, setEmail] = useState("");
   const [orgId, setOrgId] = useState(null);
+  const [isOwner, setIsOwner] = useState(false);
   const [recipients, setRecipients] = useState([]);
   const [newRecipient, setNewRecipient] = useState("");
   const [invites, setInvites] = useState([]);
@@ -19,14 +20,15 @@ export default function Settings() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return router.replace("/login");
     setEmail(session.user.email);
-    const { data: member } = await supabase.from("org_members").select("org_id, organizations ( name )").eq("user_id", session.user.id).single();
+    const { data: member } = await supabase.from("org_members").select("org_id, role, organizations ( name )").eq("user_id", session.user.id).single();
     setOrg(member?.organizations);
     setOrgId(member?.org_id);
+    setIsOwner(member?.role === "owner");
 
     const { data: rec } = await supabase.from("reminder_emails").select("id, email").eq("org_id", member?.org_id);
     setRecipients(rec || []);
 
-    const { data: inv } = await supabase.from("invites").select("id, code, used_by, created_at").eq("org_id", member?.org_id).order("created_at", { ascending: false });
+    const { data: inv } = await supabase.from("invites").select("id, code, revoked, created_at").eq("org_id", member?.org_id).order("created_at", { ascending: false });
     setInvites(inv || []);
   };
 
@@ -51,6 +53,11 @@ export default function Settings() {
     load();
   };
 
+  const revokeInvite = async (id) => {
+    await supabase.from("invites").update({ revoked: true }).eq("id", id);
+    load();
+  };
+
   const copyLink = (id, code) => {
     const link = `${window.location.origin}/signup?invite=${code}`;
     navigator.clipboard.writeText(link);
@@ -71,6 +78,7 @@ export default function Settings() {
           <div className="text-sm space-y-2" style={{ color: "#4B5563" }}>
             <div className="flex justify-between"><span>Organization</span><span style={{ color: "#16232E" }}>{org?.name || "…"}</span></div>
             <div className="flex justify-between"><span>Email</span><span style={{ color: "#16232E" }}>{email}</span></div>
+            <div className="flex justify-between"><span>Role</span><span style={{ color: "#16232E" }}>{isOwner ? "Owner" : "Member"}</span></div>
             <div className="flex justify-between"><span>Plan</span><span style={{ color: "#16232E" }}>Free</span></div>
           </div>
         </div>
@@ -80,24 +88,39 @@ export default function Settings() {
           <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>
             Anyone who joins via an invite link gets full access to this account — add and manage records, same as you.
           </p>
-          <button onClick={generateInvite} className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium mb-3" style={{ backgroundColor: "#D9A441", color: "#16232E" }}>
-            <PlusCircle size={13} /> Generate invite link
-          </button>
-          <div className="space-y-2">
-            {invites.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ backgroundColor: "#FAFAF7" }}>
-                <span className="text-xs" style={{ color: inv.used_by ? "#9CA3AF" : "#16232E" }}>
-                  {inv.used_by ? "Used ✓" : "Not used yet"} — created {new Date(inv.created_at).toLocaleDateString("en-IN")}
-                </span>
-                {!inv.used_by && (
-                  <button onClick={() => copyLink(inv.id, inv.code)} className="text-xs flex items-center gap-1" style={{ color: "#B5750A" }}>
-                    {copiedId === inv.id ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy link</>}
-                  </button>
-                )}
+
+          {isOwner ? (
+            <>
+              <button onClick={generateInvite} className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium mb-3" style={{ backgroundColor: "#D9A441", color: "#16232E" }}>
+                <PlusCircle size={13} /> Generate invite link
+              </button>
+              <p className="text-xs mb-3" style={{ color: "#9CA3AF" }}>Links are reusable by anyone who has them until you revoke them below.</p>
+              <div className="space-y-2">
+                {invites.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ backgroundColor: "#FAFAF7" }}>
+                    <span className="text-xs" style={{ color: inv.revoked ? "#9CA3AF" : "#16232E" }}>
+                      {inv.revoked ? "Revoked" : "Active"} — created {new Date(inv.created_at).toLocaleDateString("en-IN")}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      {!inv.revoked && (
+                        <>
+                          <button onClick={() => copyLink(inv.id, inv.code)} className="text-xs flex items-center gap-1" style={{ color: "#B5750A" }}>
+                            {copiedId === inv.id ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy link</>}
+                          </button>
+                          <button onClick={() => revokeInvite(inv.id)} className="text-xs" style={{ color: "#B3261E" }}>Revoke</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {invites.length === 0 && <p className="text-xs" style={{ color: "#9CA3AF" }}>No invites generated yet.</p>}
               </div>
-            ))}
-            {invites.length === 0 && <p className="text-xs" style={{ color: "#9CA3AF" }}>No invites generated yet.</p>}
-          </div>
+            </>
+          ) : (
+            <p className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-lg" style={{ backgroundColor: "#FAFAF7", color: "#9CA3AF" }}>
+              <ShieldAlert size={13} /> Only the account owner can generate or manage invite links.
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
