@@ -27,19 +27,20 @@ function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     setLoading(false);
     if (error) setError(error.message);
     else router.push("/dashboard");
   };
 
   const sendResetEmail = async () => {
-    if (!email) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
       setError("Enter your email above first, then click 'Forgot password?'");
       return;
     }
     setError("");
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) setError(error.message);
