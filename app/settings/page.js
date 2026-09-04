@@ -101,9 +101,9 @@ export default function Settings() {
         </div>
 
         <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
-          <h2 className="font-medium text-sm mb-1" style={{ color: "#16232E" }}>Reminder recipients (default)</h2>
+          <h2 className="font-medium text-sm mb-1" style={{ color: "#16232E" }}>Reminder recipients</h2>
           <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>
-            This account-level list is separate from per-category recipients (managed on each record). It does not act as a fallback for unconfigured categories.
+            Everyone added here gets notified by email when a document is 90, 60, 45, 30, 15, 7, or 1 day from expiring.
           </p>
           <div className="space-y-2 mb-3">
             {recipients.map((r) => (
