@@ -23,14 +23,15 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F5F5F1" }}>
-      <div className="bg-white rounded-xl border p-8 w-full max-w-sm" style={{ borderColor: "#E4E2D8" }}>
+      <div className="bg-white rounded-xl border p-8 w-full max-w-sm" style={{ borderColor: "#E4E2D8", borderTop: "4px solid #16232E" }}>
         <div className="flex items-center gap-2.5 mb-6">
           <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ backgroundColor: "#D9A441" }}>
             <ShieldCheck size={18} color="#16232E" />
           </div>
           <span className="font-semibold text-lg" style={{ color: "#16232E" }}>Meyaad</span>
         </div>
-        <h1 className="text-lg font-semibold mb-4" style={{ color: "#16232E" }}>Log in</h1>
+        <h1 className="text-lg font-semibold" style={{ color: "#16232E" }}>Log in</h1>
+        <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>Welcome back — enter your details below.</p>
         <form onSubmit={submit} className="space-y-3">
           <input type="email" required placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: "#E4E2D8" }} />
