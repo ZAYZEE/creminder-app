@@ -1,7 +1,9 @@
 "use client";
 import { useRouter, usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { LayoutGrid, Users, Settings, ShieldCheck, AlertTriangle, Clock } from "lucide-react";
 import { statusMeta } from "@/lib/supabase-helpers";
+import { supabase } from "@/lib/supabase";
 
 export function Badge({ status }) {
   const m = statusMeta[status];
@@ -22,6 +24,24 @@ export function Shell({ children, title, subtitle }) {
     { href: "/records", label: "Records", icon: Users },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
+
+  // Fix: browsers can restore a cached version of this page on back/forward navigation
+  // (bfcache) WITHOUT re-running the page's own session check — which meant a logged-out
+  // user could still see a stale, cached protected page. This re-verifies the session
+  // every time that happens and forces a redirect to /login if it's no longer valid.
+  useEffect(() => {
+    const checkSession = async (event) => {
+      if (event.persisted) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          window.location.replace("/login");
+        }
+      }
+    };
+    window.addEventListener("pageshow", checkSession);
+    return () => window.removeEventListener("pageshow", checkSession);
+  }, []);
+
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#F5F5F1" }}>
       <aside className="w-64 shrink-0 flex flex-col border-r" style={{ backgroundColor: "#16232E" }}>
