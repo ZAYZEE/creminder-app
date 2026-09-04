@@ -48,7 +48,7 @@ function Signup() {
 
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F5F5F1" }}>
-      <div className="bg-white rounded-xl border p-8 w-full max-w-sm" style={{ borderColor: "#E4E2D8" }}>
+      <div className="bg-white rounded-xl border p-8 w-full max-w-sm" style={{ borderColor: "#E4E2D8", borderTop: "4px solid #D9A441" }}>
         <div className="flex items-center gap-2.5 mb-6">
           <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ backgroundColor: "#D9A441" }}>
             <ShieldCheck size={18} color="#16232E" />
@@ -64,9 +64,12 @@ function Signup() {
           </div>
         )}
 
-        <h1 className="text-lg font-semibold mb-4" style={{ color: "#16232E" }}>
+        <h1 className="text-lg font-semibold" style={{ color: "#16232E" }}>
           {inviteInfo ? "Join your team" : "Create your account"}
         </h1>
+        <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>
+          {inviteInfo ? "Set your own email and password to get started." : "New here — let's get you set up."}
+        </p>
         <form onSubmit={submit} className="space-y-3">
           {!inviteInfo && (
             <input placeholder="Organization name" value={orgName} onChange={(e) => setOrgName(e.target.value)}
