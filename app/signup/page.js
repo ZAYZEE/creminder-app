@@ -15,11 +15,12 @@ export default function SignupPage() {
 function Signup() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const inviteCode = searchParams.get("invite"); // e.g. /signup?invite=abc123
+  const inviteCode = searchParams.get("invite");
 
   const [orgName, setOrgName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [inviteInfo, setInviteInfo] = useState(null);
@@ -27,14 +28,22 @@ function Signup() {
   useEffect(() => {
     if (!inviteCode) return;
     (async () => {
-      const { data } = await supabase.from("invites").select("org_id, used_by, organizations ( name )").eq("code", inviteCode).single();
-      if (data && !data.used_by) setInviteInfo(data);
+      const { data } = await supabase.from("invites").select("org_id, revoked, organizations ( name )").eq("code", inviteCode).single();
+      if (data && !data.revoked) setInviteInfo(data);
     })();
   }, [inviteCode]);
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    if (password !== confirm) {
+      setError("Passwords don't match.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     setLoading(true);
     const metadata = inviteInfo
       ? { invite_code: inviteCode }
@@ -60,7 +69,7 @@ function Signup() {
           <div className="mb-4 px-3 py-2 rounded-lg text-xs" style={{ backgroundColor: inviteInfo ? "#E7F3ED" : "#FBEAE9", color: inviteInfo ? "#1F6B4A" : "#B3261E" }}>
             {inviteInfo
               ? `You're joining ${inviteInfo.organizations?.name || "an existing organization"}`
-              : "This invite link is invalid or already used — you'll create a new organization instead."}
+              : "This invite link is invalid or has been revoked — you'll create a new organization instead."}
           </div>
         )}
 
@@ -79,13 +88,15 @@ function Signup() {
             className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: "#E4E2D8" }} />
           <input type="password" required placeholder="Password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: "#E4E2D8" }} />
+          <input type="password" required placeholder="Confirm password" minLength={6} value={confirm} onChange={(e) => setConfirm(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: "#E4E2D8" }} />
           {error && <p className="text-xs text-red-600">{error}</p>}
           <button disabled={loading} type="submit" className="w-full py-2.5 rounded-lg text-sm font-medium" style={{ backgroundColor: "#16232E", color: "white" }}>
             {loading ? "Creating…" : inviteInfo ? "Join team" : "Create account"}
           </button>
         </form>
         <p className="text-xs mt-4 text-center" style={{ color: "#6B7280" }}>
-          Already have an account? <a href="/login" className="underline" style={{ color: "#B5750A" }}>Log in</a>
+          Already have an account? <a href={inviteCode ? `/login?invite=${inviteCode}` : "/login"} className="underline" style={{ color: "#B5750A" }}>Log in</a>
         </p>
       </div>
     </div>
