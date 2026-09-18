@@ -17,6 +17,8 @@ export default function RecordDetail() {
   const [addDocFor, setAddDocFor] = useState(null); // { categoryId, categoryName }
 
   const load = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { router.replace("/login"); return; }
     const { data: r } = await supabase.from("records").select("id, name, record_types ( name )").eq("id", recordId).single();
     setRecord(r);
     const { data: c } = await supabase
