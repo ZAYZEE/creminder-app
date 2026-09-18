@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Shell } from "../components";
-import { PlusCircle, X, Mail, Users, Copy, Check, ShieldAlert } from "lucide-react";
+import { PlusCircle, X, Mail, Users, Copy, Check, UserMinus, AlertTriangle } from "lucide-react";
 
 export default function Settings() {
   const router = useRouter();
@@ -15,6 +15,8 @@ export default function Settings() {
   const [newRecipient, setNewRecipient] = useState("");
   const [invites, setInvites] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [confirmRemove, setConfirmRemove] = useState(null); // { user_id, email }
 
   const load = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -28,8 +30,12 @@ export default function Settings() {
     const { data: rec } = await supabase.from("reminder_emails").select("id, email").eq("org_id", member?.org_id);
     setRecipients(rec || []);
 
-    const { data: inv } = await supabase.from("invites").select("id, code, revoked, created_at").eq("org_id", member?.org_id).order("created_at", { ascending: false });
-    setInvites(inv || []);
+    if (member?.role === "owner") {
+      const { data: inv } = await supabase.from("invites").select("id, code, revoked, created_at").eq("org_id", member?.org_id).order("created_at", { ascending: false });
+      setInvites(inv || []);
+      const { data: mem } = await supabase.rpc("get_org_members");
+      setMembers(mem || []);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -58,6 +64,12 @@ export default function Settings() {
     load();
   };
 
+  const removeMember = async () => {
+    await supabase.from("org_members").delete().eq("user_id", confirmRemove.user_id).eq("org_id", orgId);
+    setConfirmRemove(null);
+    load();
+  };
+
   const copyLink = (id, code) => {
     const link = `${window.location.origin}/signup?invite=${code}`;
     navigator.clipboard.writeText(link);
@@ -83,45 +95,56 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
-          <h2 className="font-medium text-sm mb-1 flex items-center gap-2" style={{ color: "#16232E" }}><Users size={15} /> Team</h2>
-          <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>
-            Anyone who joins via an invite link gets full access to this account — add and manage records, same as you.
-          </p>
-
-          {isOwner ? (
-            <>
-              <button onClick={generateInvite} className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium mb-3" style={{ backgroundColor: "#D9A441", color: "#16232E" }}>
-                <PlusCircle size={13} /> Generate invite link
-              </button>
-              <p className="text-xs mb-3" style={{ color: "#9CA3AF" }}>Links are reusable by anyone who has them until you revoke them below.</p>
-              <div className="space-y-2">
-                {invites.map((inv) => (
-                  <div key={inv.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ backgroundColor: "#FAFAF7" }}>
-                    <span className="text-xs" style={{ color: inv.revoked ? "#9CA3AF" : "#16232E" }}>
-                      {inv.revoked ? "Revoked" : "Active"} — created {new Date(inv.created_at).toLocaleDateString("en-IN")}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      {!inv.revoked && (
-                        <>
-                          <button onClick={() => copyLink(inv.id, inv.code)} className="text-xs flex items-center gap-1" style={{ color: "#B5750A" }}>
-                            {copiedId === inv.id ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy link</>}
-                          </button>
-                          <button onClick={() => revokeInvite(inv.id)} className="text-xs" style={{ color: "#B3261E" }}>Revoke</button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {invites.length === 0 && <p className="text-xs" style={{ color: "#9CA3AF" }}>No invites generated yet.</p>}
-              </div>
-            </>
-          ) : (
-            <p className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-lg" style={{ backgroundColor: "#FAFAF7", color: "#9CA3AF" }}>
-              <ShieldAlert size={13} /> Only the account owner can generate or manage invite links.
+        {/* Team section — only rendered for owners at all. Members never see this section, not even a placeholder message. */}
+        {isOwner && (
+          <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
+            <h2 className="font-medium text-sm mb-1 flex items-center gap-2" style={{ color: "#16232E" }}><Users size={15} /> Team</h2>
+            <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>
+              Anyone who joins via an invite link gets full access to this account — add and manage records, same as you.
             </p>
-          )}
-        </div>
+
+            <div className="space-y-2 mb-4">
+              {members.map((m) => (
+                <div key={m.user_id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ backgroundColor: "#FAFAF7" }}>
+                  <div>
+                    <span className="text-sm" style={{ color: "#16232E" }}>{m.email}</span>
+                    <span className="text-xs ml-2 px-1.5 py-0.5 rounded" style={{ backgroundColor: m.role === "owner" ? "#D9A44120" : "#E4E2D8", color: m.role === "owner" ? "#8A5D00" : "#6B7280" }}>{m.role}</span>
+                  </div>
+                  {m.role !== "owner" && (
+                    <button onClick={() => setConfirmRemove({ user_id: m.user_id, email: m.email })} className="text-xs flex items-center gap-1" style={{ color: "#B3261E" }}>
+                      <UserMinus size={12} /> Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button onClick={generateInvite} className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium mb-3" style={{ backgroundColor: "#D9A441", color: "#16232E" }}>
+              <PlusCircle size={13} /> Generate invite link
+            </button>
+            <p className="text-xs mb-3" style={{ color: "#9CA3AF" }}>Links are reusable by anyone who has them until you revoke them below.</p>
+            <div className="space-y-2">
+              {invites.map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ backgroundColor: "#FAFAF7" }}>
+                  <span className="text-xs" style={{ color: inv.revoked ? "#9CA3AF" : "#16232E" }}>
+                    {inv.revoked ? "Revoked" : "Active"} — created {new Date(inv.created_at).toLocaleDateString("en-IN")}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    {!inv.revoked && (
+                      <>
+                        <button onClick={() => copyLink(inv.id, inv.code)} className="text-xs flex items-center gap-1" style={{ color: "#B5750A" }}>
+                          {copiedId === inv.id ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy link</>}
+                        </button>
+                        <button onClick={() => revokeInvite(inv.id)} className="text-xs" style={{ color: "#B3261E" }}>Revoke</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {invites.length === 0 && <p className="text-xs" style={{ color: "#9CA3AF" }}>No invites generated yet.</p>}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
           <h2 className="font-medium text-sm mb-1" style={{ color: "#16232E" }}>Reminder recipients</h2>
@@ -149,6 +172,21 @@ export default function Settings() {
 
         <button onClick={logout} className="text-sm px-4 py-2 rounded-lg border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>Log out</button>
       </div>
+
+      {confirmRemove && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: "rgba(22,35,46,0.45)" }}>
+          <div className="bg-white rounded-xl w-full max-w-sm p-6">
+            <div className="flex items-center gap-2 mb-2"><AlertTriangle size={18} color="#B3261E" /><h3 className="font-semibold text-base" style={{ color: "#16232E" }}>Remove team member?</h3></div>
+            <p className="text-sm mb-5" style={{ color: "#6B7280" }}>
+              {confirmRemove.email} will immediately lose access to this account. They can be re-invited later with a new link.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmRemove(null)} className="flex-1 py-2.5 rounded-lg text-sm border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>Cancel</button>
+              <button onClick={removeMember} className="flex-1 py-2.5 rounded-lg text-sm font-medium" style={{ backgroundColor: "#B3261E", color: "white" }}>Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }
