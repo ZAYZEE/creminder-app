@@ -65,7 +65,10 @@ export default function Settings() {
   };
 
   const removeMember = async () => {
-    await supabase.from("org_members").delete().eq("user_id", confirmRemove.user_id).eq("org_id", orgId);
+    const { error } = await supabase.rpc("remove_org_member", { target_user_id: confirmRemove.user_id });
+    if (error) {
+      alert(error.message); // simple surfaced error — e.g. if something unexpected blocks removal
+    }
     setConfirmRemove(null);
     load();
   };
