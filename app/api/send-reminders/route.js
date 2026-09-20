@@ -7,11 +7,14 @@ import { createClient } from "@supabase/supabase-js";
 // The client is created INSIDE the handler (not at module load time) so the app can still
 // build and deploy even before SUPABASE_SERVICE_ROLE_KEY is configured in Vercel — reminders
 // simply won't send until that env variable is added, but nothing else breaks in the meantime.
+//
+// Recipients are per DOCUMENT CATEGORY (not one flat org-wide list) — each category can
+// notify a different set of people, since different categories of paperwork are often
+// owned by different roles even within the same record.
 
 const THRESHOLDS = [90, 60, 45, 30, 15, 7, 1];
 
 export async function GET(request) {
-  // Basic protection so this endpoint can't be triggered by randoms hitting the URL
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Unauthorized", { status: 401 });
@@ -29,12 +32,10 @@ export async function GET(request) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Pull every document that has an expiry date, along with its full path
-  // (org > type > record > category) so the email can say exactly what's expiring and where.
   const { data: docs, error } = await supabaseAdmin
     .from("documents")
     .select(`
-      id, name, expiry_date, org_id,
+      id, name, expiry_date, category_id,
       document_categories ( name, records ( name, record_types ( name ) ) )
     `)
     .not("expiry_date", "is", null);
@@ -43,15 +44,14 @@ export async function GET(request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  // Group documents that need a reminder today, by organization
-  const byOrg = {};
+  // Group documents that need a reminder today, by CATEGORY (not by org)
+  const byCategory = {};
   for (const doc of docs) {
     const expiry = new Date(doc.expiry_date);
     const daysLeft = Math.round((expiry - today) / 86400000);
     const threshold = THRESHOLDS.find((t) => t === daysLeft);
     if (threshold === undefined) continue;
 
-    // Check we haven't already sent this exact document+threshold combination before
     const { data: already } = await supabaseAdmin
       .from("sent_reminders")
       .select("id")
@@ -60,21 +60,21 @@ export async function GET(request) {
       .maybeSingle();
     if (already) continue;
 
-    if (!byOrg[doc.org_id]) byOrg[doc.org_id] = [];
-    byOrg[doc.org_id].push({ ...doc, daysLeft, threshold });
+    if (!byCategory[doc.category_id]) byCategory[doc.category_id] = [];
+    byCategory[doc.category_id].push({ ...doc, daysLeft, threshold });
   }
 
   let emailsSent = 0;
 
-  for (const orgId of Object.keys(byOrg)) {
+  for (const categoryId of Object.keys(byCategory)) {
     const { data: recipients } = await supabaseAdmin
-      .from("reminder_emails")
+      .from("category_recipients")
       .select("email")
-      .eq("org_id", orgId);
+      .eq("category_id", categoryId);
 
-    if (!recipients || recipients.length === 0) continue; // no recipients configured, skip
+    if (!recipients || recipients.length === 0) continue; // no recipients configured for this category, skip
 
-    const items = byOrg[orgId];
+    const items = byCategory[categoryId];
     const rows = items
       .map((d) => {
         const path = `${d.document_categories?.records?.record_types?.name || ""} → ${d.document_categories?.records?.name || ""} → ${d.document_categories?.name || ""}`;
@@ -86,7 +86,7 @@ export async function GET(request) {
     const html = `
       <div style="font-family:sans-serif;max-width:600px;">
         <h2 style="color:#16232E;">Documents needing attention</h2>
-        <p style="color:#6B7280;">The following ${items.length} document${items.length !== 1 ? "s" : ""} on your Meyaad account ${items.length !== 1 ? "are" : "is"} approaching expiry:</p>
+        <p style="color:#6B7280;">The following ${items.length} document${items.length !== 1 ? "s" : ""} ${items.length !== 1 ? "are" : "is"} approaching expiry:</p>
         <table style="width:100%;border-collapse:collapse;margin-top:12px;">
           <thead><tr style="text-align:left;background:#FAFAF7;"><th style="padding:8px 12px;">Document</th><th style="padding:8px 12px;">Where</th><th style="padding:8px 12px;">Status</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -111,11 +111,10 @@ export async function GET(request) {
       emailsSent++;
     }
 
-    // Log every document+threshold as sent, so tomorrow's run doesn't repeat it
     for (const d of items) {
       await supabaseAdmin.from("sent_reminders").insert({ document_id: d.id, threshold_days: d.threshold });
     }
   }
 
-  return Response.json({ ok: true, orgsNotified: Object.keys(byOrg).length, emailsSent });
+  return Response.json({ ok: true, categoriesNotified: Object.keys(byCategory).length, emailsSent });
 }
