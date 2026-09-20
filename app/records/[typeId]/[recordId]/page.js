@@ -4,7 +4,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Shell, Badge } from "../../../components";
 import { statusOf, fmt } from "@/lib/supabase-helpers";
-import { PlusCircle, ChevronLeft, X, Folder, FolderPlus, FileText, Trash2, Upload, Pencil, ExternalLink, AlertTriangle } from "lucide-react";
+import { PlusCircle, ChevronLeft, X, Folder, FolderPlus, FileText, Trash2, Upload, Pencil, ExternalLink, AlertTriangle, Mail } from "lucide-react";
 
 export default function RecordDetail() {
   const router = useRouter();
@@ -18,6 +18,7 @@ export default function RecordDetail() {
   const [editDoc, setEditDoc] = useState(null); // the doc object being edited
   const [editCategory, setEditCategory] = useState(null); // the category object being edited
   const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'category'|'document', id, label }
+  const [recipientsFor, setRecipientsFor] = useState(null); // category id currently showing its recipient manager
 
   const load = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -26,7 +27,7 @@ export default function RecordDetail() {
     setRecord(r);
     const { data: c } = await supabase
       .from("document_categories")
-      .select("id, name, documents ( id, name, expiry_date, file_path )")
+      .select("id, name, documents ( id, name, expiry_date, file_path ), category_recipients ( id, email )")
       .eq("record_id", recordId)
       .order("created_at");
     setCategories(c || []);
@@ -65,6 +66,17 @@ export default function RecordDetail() {
     load();
   };
 
+  const addRecipient = async (categoryId, email) => {
+    const org_id = await orgId();
+    await supabase.from("category_recipients").insert({ category_id: categoryId, org_id, email });
+    load();
+  };
+
+  const removeRecipient = async (id) => {
+    await supabase.from("category_recipients").delete().eq("id", id);
+    load();
+  };
+
   return (
     <Shell title={record?.name || "…"} subtitle={record?.record_types?.name ? `${record.record_types.name} record` : ""}>
       <button onClick={() => router.push(`/records/${typeId}`)} className="flex items-center gap-1 text-xs mb-4" style={{ color: "#6B7280" }}>
@@ -91,6 +103,10 @@ export default function RecordDetail() {
                     className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium" style={{ backgroundColor: "#D9A44120", color: "#8A5D00" }}>
                     <PlusCircle size={12} /> Add document
                   </button>
+                  <button onClick={() => setRecipientsFor(recipientsFor === c.id ? null : c.id)}
+                    className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>
+                    <Mail size={12} /> {c.category_recipients?.length || 0} recipient{c.category_recipients?.length !== 1 ? "s" : ""}
+                  </button>
                   {editCategory !== c.id && (
                     <button onClick={() => setEditCategory(c.id)} className="text-gray-300 hover:text-gray-600 transition"><Pencil size={13} /></button>
                   )}
@@ -116,6 +132,9 @@ export default function RecordDetail() {
                     );
                   })}
                 </ul>
+              )}
+              {recipientsFor === c.id && (
+                <RecipientsPanel category={c} onAdd={addRecipient} onRemove={removeRecipient} />
               )}
             </div>
           ))}
@@ -248,6 +267,38 @@ function AddDocModal({ categoryId, categoryName, recordName, onClose, onSaved, o
             {saving ? "Saving…" : "Save & add another"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RecipientsPanel({ category, onAdd, onRemove }) {
+  const [newEmail, setNewEmail] = useState("");
+  const recipients = category.category_recipients || [];
+
+  return (
+    <div className="px-5 py-3.5" style={{ backgroundColor: "#FAFAF7" }}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium" style={{ color: "#6B7280" }}>Notify these emails when anything in "{category.name}" is due</span>
+      </div>
+      {recipients.length === 0 ? (
+        <p className="text-xs mb-2" style={{ color: "#B3261E" }}>No one added yet — reminders for this category won't be sent.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {recipients.map((r) => (
+            <span key={r.id} className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border" style={{ borderColor: "#E4E2D8", color: "#4B5563", backgroundColor: "white" }}>
+              {r.email}
+              <button onClick={() => onRemove(r.id)}><X size={11} color="#9CA3AF" /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email address"
+          className="flex-1 border rounded-lg px-2.5 py-1.5 text-xs outline-none" style={{ borderColor: "#E4E2D8" }}
+          onKeyDown={(e) => { if (e.key === "Enter" && newEmail) { onAdd(category.id, newEmail); setNewEmail(""); } }} />
+        <button onClick={() => { if (newEmail) { onAdd(category.id, newEmail); setNewEmail(""); } }}
+          className="text-xs px-2.5 py-1.5 rounded-lg font-medium" style={{ backgroundColor: "#16232E", color: "white" }}>Add</button>
       </div>
     </div>
   );
