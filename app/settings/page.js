@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Shell } from "../components";
-import { PlusCircle, X, Mail, Users, Copy, Check, UserMinus, AlertTriangle } from "lucide-react";
+import { PlusCircle, X, Users, Copy, Check, UserMinus, AlertTriangle } from "lucide-react";
 
 export default function Settings() {
   const router = useRouter();
@@ -11,8 +11,6 @@ export default function Settings() {
   const [email, setEmail] = useState("");
   const [orgId, setOrgId] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
-  const [recipients, setRecipients] = useState([]);
-  const [newRecipient, setNewRecipient] = useState("");
   const [invites, setInvites] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
   const [members, setMembers] = useState([]);
@@ -27,9 +25,6 @@ export default function Settings() {
     setOrgId(member?.org_id);
     setIsOwner(member?.role === "owner");
 
-    const { data: rec } = await supabase.from("reminder_emails").select("id, email").eq("org_id", member?.org_id);
-    setRecipients(rec || []);
-
     if (member?.role === "owner") {
       const { data: inv } = await supabase.from("invites").select("id, code, revoked, created_at").eq("org_id", member?.org_id).order("created_at", { ascending: false });
       setInvites(inv || []);
@@ -39,18 +34,6 @@ export default function Settings() {
   };
 
   useEffect(() => { load(); }, []);
-
-  const addRecipient = async () => {
-    if (!newRecipient) return;
-    await supabase.from("reminder_emails").insert({ org_id: orgId, email: newRecipient });
-    setNewRecipient("");
-    load();
-  };
-
-  const removeRecipient = async (id) => {
-    await supabase.from("reminder_emails").delete().eq("id", id);
-    load();
-  };
 
   const generateInvite = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -149,31 +132,7 @@ export default function Settings() {
           </div>
         )}
 
-        <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
-          <h2 className="font-medium text-sm mb-1" style={{ color: "#16232E" }}>Reminder recipients</h2>
-          <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>
-            Everyone added here gets notified by email when a document is 90, 60, 45, 30, 15, 7, or 1 day from expiring.
-          </p>
-          <div className="space-y-2 mb-3">
-            {recipients.map((r) => (
-              <div key={r.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ backgroundColor: "#FAFAF7" }}>
-                <span className="text-sm flex items-center gap-2" style={{ color: "#16232E" }}><Mail size={13} color="#9CA3AF" />{r.email}</span>
-                <button onClick={() => removeRecipient(r.id)}><X size={14} color="#9CA3AF" /></button>
-              </div>
-            ))}
-            {recipients.length === 0 && <p className="text-xs" style={{ color: "#9CA3AF" }}>None added.</p>}
-          </div>
-          <div className="flex gap-2">
-            <input value={newRecipient} onChange={(e) => setNewRecipient(e.target.value)} placeholder="e.g. owner@youragency.com"
-              className="flex-1 border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: "#E4E2D8" }}
-              onKeyDown={(e) => e.key === "Enter" && addRecipient()} />
-            <button onClick={addRecipient} className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1" style={{ backgroundColor: "#16232E", color: "white" }}>
-              <PlusCircle size={14} /> Add
-            </button>
-          </div>
-        </div>
-
-        <button onClick={logout} className="text-sm px-4 py-2 rounded-lg border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>Log out</button>
+                <button onClick={logout} className="text-sm px-4 py-2 rounded-lg border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>Log out</button>
       </div>
 
       {confirmRemove && (
