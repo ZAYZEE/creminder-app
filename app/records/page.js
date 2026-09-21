@@ -31,7 +31,8 @@ export default function RecordTypes() {
     if (!name) return;
     const { data: { session } } = await supabase.auth.getSession();
     const { data: member } = await supabase.from("org_members").select("org_id").eq("user_id", session.user.id).single();
-    await supabase.from("record_types").insert({ name, org_id: member.org_id });
+    const { error } = await supabase.from("record_types").insert({ name, org_id: member.org_id });
+    if (error) { alert("Couldn't add this — your trial may have ended. Check the banner above to upgrade."); return; }
     setName(""); setShowAdd(false); load();
   };
 
