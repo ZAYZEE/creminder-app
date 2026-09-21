@@ -37,7 +37,8 @@ export default function RecordsOfType() {
     if (!name) return;
     const { data: { session } } = await supabase.auth.getSession();
     const { data: member } = await supabase.from("org_members").select("org_id").eq("user_id", session.user.id).single();
-    const { data: newRec } = await supabase.from("records").insert({ name, type_id: typeId, org_id: member.org_id }).select().single();
+    const { data: newRec, error } = await supabase.from("records").insert({ name, type_id: typeId, org_id: member.org_id }).select().single();
+    if (error) { alert("Couldn't add this — your trial may have ended. Check the banner above to upgrade."); return; }
     setName(""); setShowAdd(false);
     router.push(`/records/${typeId}/${newRec.id}`);
   };
