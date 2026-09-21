@@ -45,7 +45,8 @@ export default function RecordDetail() {
   const addCategory = async () => {
     if (!newCategoryName) return;
     const org_id = await orgId();
-    await supabase.from("document_categories").insert({ name: newCategoryName, record_id: recordId, org_id });
+    const { error } = await supabase.from("document_categories").insert({ name: newCategoryName, record_id: recordId, org_id });
+    if (error) { alert("Couldn't add this — your trial may have ended. Check the banner above to upgrade."); return; }
     setNewCategoryName(""); setAddingCategory(false); load();
   };
 
@@ -223,8 +224,9 @@ function AddDocModal({ categoryId, categoryName, recordName, onClose, onSaved, o
       const { error: uploadErr } = await supabase.storage.from("documents").upload(path, file);
       if (!uploadErr) file_path = path;
     }
-    await supabase.from("documents").insert({ name, category_id: categoryId, org_id, expiry_date: noExpiry ? null : expiry, file_path });
+    const { error } = await supabase.from("documents").insert({ name, category_id: categoryId, org_id, expiry_date: noExpiry ? null : expiry, file_path });
     setSaving(false);
+    if (error) { alert("Couldn't add this — your trial may have ended. Check the banner above to upgrade."); return; }
     setName(""); setExpiry(""); setNoExpiry(false); setFile(null);
     onSaved();
   };
