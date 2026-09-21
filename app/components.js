@@ -1,6 +1,6 @@
 "use client";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LayoutGrid, Users, Settings, ShieldCheck, AlertTriangle, Clock } from "lucide-react";
 import { statusMeta } from "@/lib/supabase-helpers";
 import { supabase } from "@/lib/supabase";
@@ -19,28 +19,38 @@ export function Badge({ status }) {
 export function Shell({ children, title, subtitle }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [trial, setTrial] = useState(null); // { daysLeft, isUpgraded }
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
     { href: "/records", label: "Records", icon: Users },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
-  // Fix: browsers can restore a cached version of this page on back/forward navigation
-  // (bfcache) WITHOUT re-running the page's own session check — which meant a logged-out
-  // user could still see a stale, cached protected page. This re-verifies the session
-  // every time that happens and forces a redirect to /login if it's no longer valid.
   useEffect(() => {
     const checkSession = async (event) => {
       if (event.persisted) {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          window.location.replace("/login");
-        }
+        if (!session) window.location.replace("/login");
       }
     };
     window.addEventListener("pageshow", checkSession);
     return () => window.removeEventListener("pageshow", checkSession);
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data: member } = await supabase.from("org_members").select("org_id").eq("user_id", session.user.id).single();
+      if (!member) return;
+      const { data: org } = await supabase.from("organizations").select("trial_started_at, is_upgraded").eq("id", member.org_id).single();
+      if (!org) return;
+      const daysElapsed = Math.floor((Date.now() - new Date(org.trial_started_at)) / 86400000);
+      setTrial({ daysLeft: 14 - daysElapsed, isUpgraded: org.is_upgraded });
+    })();
+  }, []);
+
+  const trialExpired = trial && !trial.isUpgraded && trial.daysLeft <= 0;
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#F5F5F1" }}>
@@ -67,13 +77,26 @@ export function Shell({ children, title, subtitle }) {
             );
           })}
         </nav>
+        {trial && !trial.isUpgraded && (
+          <div className="mx-3 mb-4 px-3 py-2.5 rounded-lg text-xs" style={{ backgroundColor: trialExpired ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: trialExpired ? "#F87171" : "#D9A441" }}>
+            {trialExpired ? "Trial ended — upgrade to continue" : `${trial.daysLeft} day${trial.daysLeft !== 1 ? "s" : ""} left in trial`}
+          </div>
+        )}
       </aside>
       <main className="flex-1 flex flex-col">
         <header className="px-8 py-5 border-b" style={{ borderColor: "#E4E2D8" }}>
           <h1 className="text-xl font-semibold" style={{ color: "#16232E" }}>{title}</h1>
           {subtitle && <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{subtitle}</p>}
         </header>
-        <div className="flex-1 overflow-auto px-8 py-6">{children}</div>
+        <div className="flex-1 overflow-auto px-8 py-6">
+          {trialExpired && (
+            <div className="mb-4 px-4 py-3 rounded-lg text-sm flex items-center gap-2" style={{ backgroundColor: "#FBEAE9", color: "#B3261E" }}>
+              <AlertTriangle size={15} />
+              Your 14-day trial has ended. You can still view everything you've added, but adding new records, categories, or documents is paused until you upgrade.
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );
