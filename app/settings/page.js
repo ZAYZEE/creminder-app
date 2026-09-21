@@ -15,6 +15,11 @@ export default function Settings() {
   const [copiedId, setCopiedId] = useState(null);
   const [members, setMembers] = useState([]);
   const [confirmRemove, setConfirmRemove] = useState(null); // { user_id, email }
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
 
   const load = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -66,6 +71,28 @@ export default function Settings() {
   const logout = async () => {
     await supabase.auth.signOut();
     router.replace("/login");
+  };
+
+  const changePassword = async () => {
+    setPwError("");
+    setPwSuccess(false);
+    if (newPassword !== confirmPassword) {
+      setPwError("Passwords don't match.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPwError("Password must be at least 6 characters.");
+      return;
+    }
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setPwSaving(false);
+    if (error) setPwError(error.message);
+    else {
+      setPwSuccess(true);
+      setNewPassword("");
+      setConfirmPassword("");
+    }
   };
 
   return (
@@ -132,7 +159,25 @@ export default function Settings() {
           </div>
         )}
 
-                <button onClick={logout} className="text-sm px-4 py-2 rounded-lg border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>Log out</button>
+        <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
+          <h2 className="font-medium text-sm mb-4" style={{ color: "#16232E" }}>Change password</h2>
+          {pwSuccess ? (
+            <p className="text-xs px-3 py-2 rounded-lg" style={{ backgroundColor: "#E7F3ED", color: "#1F6B4A" }}>Password updated.</p>
+          ) : (
+            <div className="space-y-3">
+              <input type="password" placeholder="New password" minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: "#E4E2D8" }} />
+              <input type="password" placeholder="Confirm new password" minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: "#E4E2D8" }} />
+              {pwError && <p className="text-xs text-red-600">{pwError}</p>}
+              <button disabled={pwSaving} onClick={changePassword} className="text-sm px-4 py-2 rounded-lg font-medium" style={{ backgroundColor: "#16232E", color: "white" }}>
+                {pwSaving ? "Updating…" : "Update password"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <button onClick={logout} className="text-sm px-4 py-2 rounded-lg border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>Log out</button>
       </div>
 
       {confirmRemove && (
