@@ -35,7 +35,7 @@ export async function GET(request) {
   const { data: docs, error } = await supabaseAdmin
     .from("documents")
     .select(`
-      id, name, expiry_date, category_id,
+      id, name, expiry_date, category_id, org_id,
       document_categories ( name, records ( name, record_types ( name ) ) )
     `)
     .not("expiry_date", "is", null);
@@ -44,9 +44,24 @@ export async function GET(request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  // Skip documents belonging to organizations whose trial has ended and haven't upgraded —
+  // reminders are part of the paid value, not something that should keep working for free
+  // indefinitely just because someone finished adding their documents during the trial.
+  const orgIds = [...new Set(docs.map((d) => d.org_id))];
+  const { data: orgs } = await supabaseAdmin
+    .from("organizations")
+    .select("id, trial_started_at, trial_length_days, is_upgraded")
+    .in("id", orgIds);
+  const activeOrgIds = new Set(
+    (orgs || [])
+      .filter((o) => o.is_upgraded || (Date.now() - new Date(o.trial_started_at)) < o.trial_length_days * 86400000)
+      .map((o) => o.id)
+  );
+  const activeDocs = docs.filter((d) => activeOrgIds.has(d.org_id));
+
   // Group documents that need a reminder today, by CATEGORY (not by org)
   const byCategory = {};
-  for (const doc of docs) {
+  for (const doc of activeDocs) {
     const expiry = new Date(doc.expiry_date);
     const daysLeft = Math.round((expiry - today) / 86400000);
     const threshold = THRESHOLDS.find((t) => t === daysLeft);
