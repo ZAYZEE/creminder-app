@@ -43,10 +43,10 @@ export function Shell({ children, title, subtitle }) {
       if (!session) return;
       const { data: member } = await supabase.from("org_members").select("org_id").eq("user_id", session.user.id).single();
       if (!member) return;
-      const { data: org } = await supabase.from("organizations").select("trial_started_at, is_upgraded").eq("id", member.org_id).single();
+      const { data: org } = await supabase.from("organizations").select("trial_started_at, is_upgraded, trial_length_days").eq("id", member.org_id).single();
       if (!org) return;
       const daysElapsed = Math.floor((Date.now() - new Date(org.trial_started_at)) / 86400000);
-      setTrial({ daysLeft: 14 - daysElapsed, isUpgraded: org.is_upgraded });
+      setTrial({ daysLeft: org.trial_length_days - daysElapsed, isUpgraded: org.is_upgraded });
     })();
   }, []);
 
