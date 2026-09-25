@@ -92,7 +92,7 @@ export function Shell({ children, title, subtitle }) {
           {trialExpired && (
             <div className="mb-4 px-4 py-3 rounded-lg text-sm flex items-center gap-2" style={{ backgroundColor: "#FBEAE9", color: "#B3261E" }}>
               <AlertTriangle size={15} />
-              Your 14-day trial has ended. You can still view everything you've added, but adding new records, categories, or documents is paused until you upgrade.
+              Your trial has ended. Upgrade to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you upgrade.
             </div>
           )}
           {children}
