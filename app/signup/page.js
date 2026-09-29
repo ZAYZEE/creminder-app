@@ -62,7 +62,7 @@ function Signup() {
           <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ backgroundColor: "#D9A441" }}>
             <ShieldCheck size={18} color="#16232E" />
           </div>
-          <span className="font-semibold text-lg" style={{ color: "#16232E" }}>Meyaad</span>
+          <span className="font-semibold text-lg" style={{ color: "#16232E" }}>Rule Watch</span>
         </div>
 
         {inviteCode && (
