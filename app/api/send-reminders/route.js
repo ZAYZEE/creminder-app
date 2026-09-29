@@ -117,7 +117,7 @@ export async function GET(request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "Meyaad Reminders <reminders@rulewatch.in>",
+          from: "Rule Watch Reminders <reminders@rulewatch.in>",
           to: r.email,
           subject: `${items.length} document${items.length !== 1 ? "s" : ""} expiring soon`,
           html,
