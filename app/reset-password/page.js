@@ -37,7 +37,7 @@ export default function ResetPassword() {
           <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ backgroundColor: "#D9A441" }}>
             <ShieldCheck size={18} color="#16232E" />
           </div>
-          <span className="font-semibold text-lg" style={{ color: "#16232E" }}>Meyaad</span>
+          <span className="font-semibold text-lg" style={{ color: "#16232E" }}>Rule Watch</span>
         </div>
         <h1 className="text-lg font-semibold mb-4" style={{ color: "#16232E" }}>Set a new password</h1>
 
