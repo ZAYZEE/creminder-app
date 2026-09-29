@@ -60,7 +60,7 @@ export function Shell({ children, title, subtitle }) {
             <ShieldCheck size={18} color="#16232E" />
           </div>
           <div>
-            <div className="text-white font-semibold text-[15px] leading-tight">Meyaad</div>
+            <div className="text-white font-semibold text-[15px] leading-tight">Rule Watch</div>
             <div className="text-[11px] text-white/40 leading-tight">expiry tracking</div>
           </div>
         </div>
