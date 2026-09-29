@@ -1,6 +1,6 @@
 import "./globals.css";
 
-export const metadata = { title: "Meyaad — expiry tracking" };
+export const metadata = { title: "Rule Watch — expiry tracking" };
 
 export default function RootLayout({ children }) {
   return (
