@@ -27,20 +27,19 @@ function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) setError(error.message);
     else router.push("/dashboard");
   };
 
   const sendResetEmail = async () => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail) {
+    if (!email) {
       setError("Enter your email above first, then click 'Forgot password?'");
       return;
     }
     setError("");
-    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) setError(error.message);
@@ -56,7 +55,7 @@ function Login() {
           <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ backgroundColor: "#D9A441" }}>
             <ShieldCheck size={18} color="#16232E" />
           </div>
-          <span className="font-semibold text-lg" style={{ color: "#16232E" }}>Meyaad</span>
+          <span className="font-semibold text-lg" style={{ color: "#16232E" }}>Rule Watch</span>
         </div>
         <h1 className="text-lg font-semibold" style={{ color: "#16232E" }}>Log in</h1>
         <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>Welcome back — enter your details below.</p>
