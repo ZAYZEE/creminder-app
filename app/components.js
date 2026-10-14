@@ -19,7 +19,7 @@ export function Badge({ status }) {
 export function Shell({ children, title, subtitle }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [trial, setTrial] = useState(null); // { daysLeft, isUpgraded }
+  const [status, setStatus] = useState(null); // from get_org_status()
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
     { href: "/records", label: "Records", icon: Users },
@@ -41,16 +41,18 @@ export function Shell({ children, title, subtitle }) {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const { data: member } = await supabase.from("org_members").select("org_id").eq("user_id", session.user.id).single();
-      if (!member) return;
-      const { data: org } = await supabase.from("organizations").select("trial_started_at, is_upgraded, trial_length_days").eq("id", member.org_id).single();
-      if (!org) return;
-      const daysElapsed = Math.floor((Date.now() - new Date(org.trial_started_at)) / 86400000);
-      setTrial({ daysLeft: org.trial_length_days - daysElapsed, isUpgraded: org.is_upgraded });
+      const { data } = await supabase.rpc("get_org_status");
+      if (data && data[0]) setStatus(data[0]);
     })();
   }, []);
 
-  const trialExpired = trial && !trial.isUpgraded && trial.daysLeft <= 0;
+  const daysLeft = (iso) => Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 86400000));
+  const locked = status && !status.is_active;
+  const hadPlan = status && status.plan_id;
+  const sidebarNote = !status || status.is_upgraded ? null
+    : locked ? (hadPlan ? "Plan ended — renew to continue" : "Trial ended — upgrade to continue")
+    : status.plan_active ? `${status.plan_name} plan · ${daysLeft(status.plan_ends_at)} day${daysLeft(status.plan_ends_at) !== 1 ? "s" : ""} left`
+    : `${daysLeft(status.trial_ends_at)} day${daysLeft(status.trial_ends_at) !== 1 ? "s" : ""} left in trial`;
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#F5F5F1" }}>
@@ -77,9 +79,9 @@ export function Shell({ children, title, subtitle }) {
             );
           })}
         </nav>
-        {trial && !trial.isUpgraded && (
-          <div className="mx-3 mb-4 px-3 py-2.5 rounded-lg text-xs" style={{ backgroundColor: trialExpired ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: trialExpired ? "#F87171" : "#D9A441" }}>
-            {trialExpired ? "Trial ended — upgrade to continue" : `${trial.daysLeft} day${trial.daysLeft !== 1 ? "s" : ""} left in trial`}
+        {sidebarNote && (
+          <div className="mx-3 mb-4 px-3 py-2.5 rounded-lg text-xs" style={{ backgroundColor: locked ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: locked ? "#F87171" : "#D9A441" }}>
+            {sidebarNote}
           </div>
         )}
       </aside>
@@ -89,10 +91,12 @@ export function Shell({ children, title, subtitle }) {
           {subtitle && <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{subtitle}</p>}
         </header>
         <div className="flex-1 overflow-auto px-8 py-6">
-          {trialExpired && (
+          {locked && (
             <div className="mb-4 px-4 py-3 rounded-lg text-sm flex items-center gap-2" style={{ backgroundColor: "#FBEAE9", color: "#B3261E" }}>
               <AlertTriangle size={15} />
-              Your trial has ended. Upgrade to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you upgrade.
+              {hadPlan
+                ? "Your plan has ended. Renew to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you renew."
+                : "Your trial has ended. Upgrade to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you upgrade."}
             </div>
           )}
           {children}
