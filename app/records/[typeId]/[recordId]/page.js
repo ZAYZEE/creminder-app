@@ -226,7 +226,7 @@ function AddDocModal({ categoryId, categoryName, recordName, onClose, onSaved, o
     }
     const { error } = await supabase.from("documents").insert({ name, category_id: categoryId, org_id, expiry_date: noExpiry ? null : expiry, file_path });
     setSaving(false);
-    if (error) { alert("Couldn't add this — your trial may have ended. Check the banner above to upgrade."); return; }
+    if (error) { alert("Couldn't add this document — you may have reached your plan's document limit, or your trial or plan has ended. Check the banner or sidebar for your status."); return; }
     setName(""); setExpiry(""); setNoExpiry(false); setFile(null);
     onSaved();
   };
