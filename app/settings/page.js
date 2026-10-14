@@ -14,6 +14,7 @@ export default function Settings() {
   const [invites, setInvites] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
   const [members, setMembers] = useState([]);
+  const [status, setStatus] = useState(null); // from get_org_status()
   const [confirmRemove, setConfirmRemove] = useState(null); // { user_id, email }
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,6 +30,9 @@ export default function Settings() {
     setOrg(member?.organizations);
     setOrgId(member?.org_id);
     setIsOwner(member?.role === "owner");
+
+    const { data: st } = await supabase.rpc("get_org_status");
+    if (st && st[0]) setStatus(st[0]);
 
     if (member?.role === "owner") {
       const { data: inv } = await supabase.from("invites").select("id, code, revoked, created_at").eq("org_id", member?.org_id).order("created_at", { ascending: false });
@@ -95,6 +99,55 @@ export default function Settings() {
     }
   };
 
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const daysLeft = (iso) => Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 86400000));
+  const plural = (n, word) => `${n} ${word}${n !== 1 ? "s" : ""}`;
+
+  let planTitle = "";
+  let planDetail = "";
+  let planLocked = false;
+  let usageText = "";
+  let usagePct = null;
+  let usageColor = "#1F6B4A";
+  let usageWarning = "";
+  if (status) {
+    if (status.is_upgraded) {
+      planTitle = "Complimentary access";
+      planDetail = "No expiry date or document limit on this account.";
+      usageText = `${plural(status.docs_used, "document")} tracked`;
+    } else if (status.plan_active) {
+      planTitle = `${status.plan_name} plan`;
+      planDetail = `Active until ${fmtDate(status.plan_ends_at)} · ${plural(daysLeft(status.plan_ends_at), "day")} left`;
+      if (status.doc_limit == null) {
+        usageText = `${plural(status.docs_used, "document")} tracked · no limit on this plan`;
+      } else {
+        usagePct = Math.min(100, Math.round((status.docs_used / status.doc_limit) * 100));
+        usageText = `${status.docs_used} of ${status.doc_limit} documents used`;
+        if (status.docs_used >= status.doc_limit) {
+          usageColor = "#B3261E";
+          usageWarning = "You've reached this plan's document limit. Move to a higher plan to add more.";
+        } else if (usagePct >= 80) {
+          usageColor = "#B5750A";
+          usageWarning = "You're close to this plan's document limit.";
+        }
+      }
+    } else if (status.in_trial) {
+      planTitle = "Free trial";
+      planDetail = `Ends ${fmtDate(status.trial_ends_at)} · ${plural(daysLeft(status.trial_ends_at), "day")} left`;
+      usageText = `${plural(status.docs_used, "document")} added · no limit during the trial`;
+    } else if (status.plan_id) {
+      planLocked = true;
+      planTitle = `${status.plan_name} plan ended`;
+      planDetail = `Ended on ${fmtDate(status.plan_ends_at)}. Everything you've added is safe and paused until you renew.`;
+      usageText = `${plural(status.docs_used, "document")} saved`;
+    } else {
+      planLocked = true;
+      planTitle = "Free trial ended";
+      planDetail = `Ended on ${fmtDate(status.trial_ends_at)}. Everything you've added is safe and paused until you upgrade.`;
+      usageText = `${plural(status.docs_used, "document")} saved`;
+    }
+  }
+
   return (
     <Shell title="Settings">
       <div className="max-w-lg space-y-6">
@@ -104,9 +157,23 @@ export default function Settings() {
             <div className="flex justify-between"><span>Organization</span><span style={{ color: "#16232E" }}>{org?.name || "…"}</span></div>
             <div className="flex justify-between"><span>Email</span><span style={{ color: "#16232E" }}>{email}</span></div>
             <div className="flex justify-between"><span>Role</span><span style={{ color: "#16232E" }}>{isOwner ? "Owner" : "Member"}</span></div>
-            <div className="flex justify-between"><span>Plan</span><span style={{ color: "#16232E" }}>Free</span></div>
           </div>
         </div>
+
+        {status && (
+          <div className="bg-white rounded-xl border p-5" style={{ borderColor: planLocked ? "#F3C9C6" : "#E4E2D8" }}>
+            <h2 className="font-medium text-sm mb-3" style={{ color: "#16232E" }}>Plan &amp; usage</h2>
+            <div className="text-sm font-medium" style={{ color: planLocked ? "#B3261E" : "#16232E" }}>{planTitle}</div>
+            <div className="text-xs mt-0.5 mb-4" style={{ color: planLocked ? "#B3261E" : "#6B7280" }}>{planDetail}</div>
+            <div className="text-xs mb-1.5" style={{ color: "#4B5563" }}>{usageText}</div>
+            {usagePct !== null && (
+              <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#EEEDE6" }}>
+                <div className="h-full rounded-full" style={{ width: `${usagePct}%`, backgroundColor: usageColor }} />
+              </div>
+            )}
+            {usageWarning && <div className="text-xs mt-2" style={{ color: usageColor }}>{usageWarning}</div>}
+          </div>
+        )}
 
         {/* Team section — only rendered for owners at all. Members never see this section, not even a placeholder message. */}
         {isOwner && (
