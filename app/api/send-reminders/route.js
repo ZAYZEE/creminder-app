@@ -44,19 +44,15 @@ export async function GET(request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  // Skip documents belonging to organizations whose trial has ended and haven't upgraded —
-  // reminders are part of the paid value, not something that should keep working for free
-  // indefinitely just because someone finished adding their documents during the trial.
+  // Skip documents belonging to organizations that are locked (trial ended, plan ended,
+  // not comped) — reminders are part of the paid value. Uses the same org_is_active rule
+  // the database uses, so the two can never disagree.
   const orgIds = [...new Set(docs.map((d) => d.org_id))];
-  const { data: orgs } = await supabaseAdmin
-    .from("organizations")
-    .select("id, trial_started_at, trial_length_days, is_upgraded")
-    .in("id", orgIds);
-  const activeOrgIds = new Set(
-    (orgs || [])
-      .filter((o) => o.is_upgraded || (Date.now() - new Date(o.trial_started_at)) < o.trial_length_days * 86400000)
-      .map((o) => o.id)
-  );
+  const activeOrgIds = new Set();
+  for (const id of orgIds) {
+    const { data: active } = await supabaseAdmin.rpc("org_is_active", { check_org_id: id });
+    if (active) activeOrgIds.add(id);
+  }
   const activeDocs = docs.filter((d) => activeOrgIds.has(d.org_id));
 
   // Group documents that need a reminder today, by CATEGORY (not by org)
