@@ -80,9 +80,11 @@ export function Shell({ children, title, subtitle }) {
           })}
         </nav>
         {sidebarNote && (
-          <div className="mx-3 mb-4 px-3 py-2.5 rounded-lg text-xs" style={{ backgroundColor: locked ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: locked ? "#F87171" : "#D9A441" }}>
+          <button onClick={() => router.push("/upgrade")} className="mx-3 mb-4 px-3 py-2.5 rounded-lg text-xs text-left hover:opacity-80 transition"
+            style={{ backgroundColor: locked ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: locked ? "#F87171" : "#D9A441" }}>
             {sidebarNote}
-          </div>
+            <span className="block mt-0.5 underline">View plans</span>
+          </button>
         )}
       </aside>
       <main className="flex-1 flex flex-col">
@@ -97,6 +99,7 @@ export function Shell({ children, title, subtitle }) {
               {hadPlan
                 ? "Your plan has ended. Renew to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you renew."
                 : "Your trial has ended. Upgrade to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you upgrade."}
+              <button onClick={() => router.push("/upgrade")} className="ml-auto shrink-0 underline font-medium">View plans</button>
             </div>
           )}
           {children}
