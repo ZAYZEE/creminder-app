@@ -172,6 +172,11 @@ export default function Settings() {
               </div>
             )}
             {usageWarning && <div className="text-xs mt-2" style={{ color: usageColor }}>{usageWarning}</div>}
+            {!status.is_upgraded && (
+              <button onClick={() => router.push("/upgrade")} className="mt-4 text-xs font-medium px-3 py-2 rounded-lg" style={{ backgroundColor: "#16232E", color: "white" }}>
+                View plans &amp; upgrade
+              </button>
+            )}
           </div>
         )}
 
