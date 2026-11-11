@@ -49,8 +49,10 @@ export function Shell({ children, title, subtitle }) {
   const daysLeft = (iso) => Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 86400000));
   const locked = status && !status.is_active;
   const hadPlan = status && status.plan_id;
+  const overLimit = status && status.is_active && status.over_limit;
   const sidebarNote = !status || status.is_upgraded ? null
     : locked ? (hadPlan ? "Plan ended — renew to continue" : "Trial ended — upgrade to continue")
+    : overLimit ? "Over your plan's document limit"
     : status.plan_active ? `${status.plan_name} plan · ${daysLeft(status.plan_ends_at)} day${daysLeft(status.plan_ends_at) !== 1 ? "s" : ""} left`
     : `${daysLeft(status.trial_ends_at)} day${daysLeft(status.trial_ends_at) !== 1 ? "s" : ""} left in trial`;
 
@@ -81,7 +83,7 @@ export function Shell({ children, title, subtitle }) {
         </nav>
         {sidebarNote && (
           <button onClick={() => router.push("/upgrade")} className="mx-3 mb-4 px-3 py-2.5 rounded-lg text-xs text-left hover:opacity-80 transition"
-            style={{ backgroundColor: locked ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: locked ? "#F87171" : "#D9A441" }}>
+            style={{ backgroundColor: (locked || overLimit) ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: (locked || overLimit) ? "#F87171" : "#D9A441" }}>
             {sidebarNote}
             <span className="block mt-0.5 underline">View plans</span>
           </button>
@@ -99,6 +101,13 @@ export function Shell({ children, title, subtitle }) {
               {hadPlan
                 ? "Your plan has ended. Renew to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you renew."
                 : "Your trial has ended. Upgrade to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you upgrade."}
+              <button onClick={() => router.push("/upgrade")} className="ml-auto shrink-0 underline font-medium">View plans</button>
+            </div>
+          )}
+          {overLimit && (
+            <div className="mb-4 px-4 py-3 rounded-lg text-sm flex items-center gap-2" style={{ backgroundColor: "#FBEAE9", color: "#B3261E" }}>
+              <AlertTriangle size={15} />
+              {`You have ${status.docs_used} documents, but your ${status.plan_name} plan allows ${status.doc_limit}. Reminders are paused and expiry dates are hidden until you delete ${status.docs_used - status.doc_limit} or move to a bigger plan.`}
               <button onClick={() => router.push("/upgrade")} className="ml-auto shrink-0 underline font-medium">View plans</button>
             </div>
           )}
