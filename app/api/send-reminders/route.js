@@ -51,7 +51,9 @@ export async function GET(request) {
   const activeOrgIds = new Set();
   for (const id of orgIds) {
     const { data: active } = await supabaseAdmin.rpc("org_is_active", { check_org_id: id });
-    if (active) activeOrgIds.add(id);
+    // Over the plan's document limit: reminders stay paused until they delete documents or upgrade
+    const { data: over } = await supabaseAdmin.rpc("org_over_limit", { check_org_id: id });
+    if (active && !over) activeOrgIds.add(id);
   }
   const activeDocs = docs.filter((d) => activeOrgIds.has(d.org_id));
 
