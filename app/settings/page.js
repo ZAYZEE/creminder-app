@@ -123,7 +123,10 @@ export default function Settings() {
       } else {
         usagePct = Math.min(100, Math.round((status.docs_used / status.doc_limit) * 100));
         usageText = `${status.docs_used} of ${status.doc_limit} documents used`;
-        if (status.docs_used >= status.doc_limit) {
+        if (status.docs_used > status.doc_limit) {
+          usageColor = "#B3261E";
+          usageWarning = `You're over this plan's limit by ${status.docs_used - status.doc_limit}. Delete that many or move to a bigger plan; reminders and expiry dates are paused until then.`;
+        } else if (status.docs_used >= status.doc_limit) {
           usageColor = "#B3261E";
           usageWarning = "You've reached this plan's document limit. Move to a higher plan to add more.";
         } else if (usagePct >= 80) {
