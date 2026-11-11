@@ -3,10 +3,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Shell } from "../components";
-import { Check, X, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle } from "lucide-react";
 
 const PERIODS = [1, 6, 12];
 const rupees = (n) => "₹" + Number(n).toLocaleString("en-IN");
+const dateFmt = (d) => d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+const addMonths = (m) => { const d = new Date(); d.setMonth(d.getMonth() + m); return d; };
 
 export default function Upgrade() {
   const router = useRouter();
@@ -18,7 +20,8 @@ export default function Upgrade() {
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(null);
   const [months, setMonths] = useState(12);
-  const [confirm, setConfirm] = useState(null); // the plan being confirmed
+  const [quotes, setQuotes] = useState({});
+  const [confirm, setConfirm] = useState(null); // { plan, quote }
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(null);
@@ -46,22 +49,38 @@ export default function Upgrade() {
 
   useEffect(() => { load(); }, []);
 
+  // The database works out price, credit and balance, so what you see is what you're charged
+  useEffect(() => {
+    if (!plans.length) return;
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(plans.map((p) => supabase.rpc("quote_plan", { p_plan_id: p.id, p_months: months })));
+      if (cancelled) return;
+      const map = {};
+      plans.forEach((p, i) => { const row = results[i].data && results[i].data[0]; if (row) map[p.id] = row; });
+      setQuotes(map);
+    })();
+    return () => { cancelled = true; };
+  }, [plans, months, status]);
+
   const discountFor = (m) =>
     m === 6 ? Number(settings.prepay_discount_6_months?.value || 0)
     : m === 12 ? Number(settings.prepay_discount_12_months?.value || 0)
     : 0;
-  const totalFor = (plan, m) => Math.round((plan.monthly_price * m * (100 - discountFor(m))) / 100);
   const paymentLink = settings.payment_link_url?.text_value || "";
   const planName = (id) => plans.find((p) => p.id === id)?.name || "";
+  const running = !!(status && status.plan_active);
+  const runningEnd = running ? new Date(status.plan_ends_at) : null;
+  const periodAllowed = (m) => !running || addMonths(m) >= runningEnd;
 
   const submit = async () => {
     setSubmitting(true);
     setError("");
-    const { data, error: err } = await supabase.rpc("request_plan", { p_plan_id: confirm.id, p_months: months });
+    const { data, error: err } = await supabase.rpc("request_plan", { p_plan_id: confirm.plan.id, p_months: months });
     setSubmitting(false);
     if (err) { setError(err.message); return; }
     const row = data && data[0];
-    setDone({ name: row?.out_plan_name || confirm.name, months, amount: row?.out_amount ?? totalFor(confirm, months) });
+    setDone({ name: row?.out_plan_name || confirm.plan.name, months, amount: row?.out_amount ?? confirm.quote.out_amount });
     setConfirm(null);
     load();
   };
@@ -78,9 +97,15 @@ export default function Upgrade() {
             </div>
           )}
 
+          {running && (
+            <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: "#F5F5F1", color: "#4B5563" }}>
+              Your {status.plan_name} plan runs until {dateFmt(runningEnd)}. Renewing or moving to a higher plan starts a fresh period today, and the unused time on your current plan is credited against the price. A lower plan can be chosen once the current one ends.
+            </div>
+          )}
+
           {done && (
             <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: "#E7F3ED", color: "#1F6B4A" }}>
-              <div className="font-medium">Request received: {done.name} plan, {done.months === 1 ? "1 month" : `${done.months} months`} — {rupees(done.amount)}</div>
+              <div className="font-medium">Request received: {done.name} plan, {done.months === 1 ? "1 month" : `${done.months} months`} — {rupees(done.amount)} to pay</div>
               <div className="mt-0.5">
                 {paymentLink
                   ? "Complete your payment on the payment page. Your plan starts once we confirm it."
@@ -96,7 +121,7 @@ export default function Upgrade() {
 
           {!done && pending && (
             <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: "#FAF6E0", color: "#8A6D00" }}>
-              <div className="font-medium">Open request: {planName(pending.plan_id)} plan, {pending.months === 1 ? "1 month" : `${pending.months} months`} — {rupees(pending.amount)}</div>
+              <div className="font-medium">Open request: {planName(pending.plan_id)} plan, {pending.months === 1 ? "1 month" : `${pending.months} months`} — {rupees(pending.amount)} to pay</div>
               <div className="mt-0.5">Waiting for payment confirmation. Choosing a different plan below replaces this request.</div>
               {paymentLink && (
                 <a href={paymentLink} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs font-medium px-3 py-2 rounded-lg" style={{ backgroundColor: "#16232E", color: "white" }}>
@@ -110,8 +135,11 @@ export default function Upgrade() {
             {PERIODS.map((m) => {
               const d = discountFor(m);
               const active = months === m;
+              const allowed = periodAllowed(m);
               return (
-                <button key={m} onClick={() => setMonths(m)} className="text-sm px-4 py-2 rounded-full border transition"
+                <button key={m} disabled={!allowed} onClick={() => setMonths(m)}
+                  title={allowed ? undefined : "Too short: the new plan must run at least until your current plan ends"}
+                  className="text-sm px-4 py-2 rounded-full border transition disabled:opacity-40"
                   style={{ borderColor: active ? "#16232E" : "#E4E2D8", backgroundColor: active ? "#16232E" : "white", color: active ? "white" : "#4B5563" }}>
                   {m === 1 ? "Monthly" : `${m} months`}
                   {d > 0 && <span className="ml-2 text-xs" style={{ color: active ? "#D9A441" : "#1F6B4A" }}>save {d}%</span>}
@@ -122,13 +150,16 @@ export default function Upgrade() {
 
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             {plans.map((plan) => {
-              const total = totalFor(plan, months);
-              const full = plan.monthly_price * months;
-              const save = full - total;
-              const perMonth = Math.round(total / months);
-              const tooMany = plan.doc_limit != null && status && status.docs_used > plan.doc_limit;
-              const isCurrent = status?.plan_active && status.plan_id === plan.id;
-              const disabled = !isOwner || tooMany;
+              const q = quotes[plan.id];
+              const price = q ? q.out_price : null;
+              const credit = q ? q.out_credit : 0;
+              const pay = q ? q.out_amount : null;
+              const ok = q ? q.out_ok : false;
+              const save = price != null ? plan.monthly_price * months - price : 0;
+              const perMonth = price != null ? Math.round(price / months) : 0;
+              const isCurrent = running && status.plan_id === plan.id;
+              const disabled = !isOwner || !ok;
+              const label = !running ? "Choose plan" : isCurrent ? "Renew now" : "Upgrade now";
               return (
                 <div key={plan.id} className="bg-white rounded-xl border p-5 flex flex-col" style={{ borderColor: isCurrent ? "#D9A441" : "#E4E2D8" }}>
                   <div className="flex items-center justify-between">
@@ -139,22 +170,31 @@ export default function Upgrade() {
                     {plan.doc_limit == null ? "Unlimited documents" : `Up to ${plan.doc_limit} documents`}
                   </div>
                   <div className="mt-4">
-                    <span className="text-2xl font-semibold" style={{ color: "#16232E" }}>{rupees(total)}</span>
+                    <span className="text-2xl font-semibold" style={{ color: "#16232E" }}>{price != null ? rupees(price) : "…"}</span>
                     <span className="text-xs ml-1" style={{ color: "#6B7280" }}>{months === 1 ? "/ month" : `for ${months} months`}</span>
                   </div>
                   <div className="text-xs mt-1 min-h-[2rem]" style={{ color: "#1F6B4A" }}>
                     {months > 1 && save > 0 ? `${rupees(perMonth)}/month · you save ${rupees(save)}` : ""}
                   </div>
-                  {tooMany && (
-                    <div className="text-xs mt-2 flex items-start gap-1" style={{ color: "#B3261E" }}>
-                      <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                      You have {status.docs_used} documents, more than this plan allows.
+                  {ok && credit > 0 && (
+                    <div className="text-xs mt-1" style={{ color: "#4B5563" }}>
+                      Less credit for unused time: −{rupees(credit)}
+                      <div className="text-sm font-medium mt-0.5" style={{ color: "#16232E" }}>You pay {rupees(pay)}</div>
                     </div>
                   )}
-                  <button disabled={disabled} onClick={() => { setError(""); setConfirm(plan); }}
-                    className="mt-auto pt-0 w-full py-2.5 rounded-lg text-sm font-medium transition disabled:opacity-40"
+                  {q && !ok && (
+                    <div className="text-xs mt-2" style={{ color: "#6B7280" }}>{q.out_reason}</div>
+                  )}
+                  {q && ok && q.out_docs_over > 0 && (
+                    <div className="text-xs mt-2 flex items-start gap-1" style={{ color: "#B5750A" }}>
+                      <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                      You have {status?.docs_used} documents and this plan allows {plan.doc_limit}. You'd need to delete {q.out_docs_over} before reminders resume.
+                    </div>
+                  )}
+                  <button disabled={disabled} onClick={() => { setError(""); setConfirm({ plan, quote: q }); }}
+                    className="w-full py-2.5 rounded-lg text-sm font-medium transition disabled:opacity-40"
                     style={{ backgroundColor: "#16232E", color: "white", marginTop: "1rem" }}>
-                    {isCurrent ? "Renew" : "Choose plan"}
+                    {label}
                   </button>
                 </div>
               );
@@ -175,10 +215,20 @@ export default function Upgrade() {
               <button onClick={() => setConfirm(null)}><X size={18} color="#9CA3AF" /></button>
             </div>
             <div className="text-sm space-y-1.5 mb-4" style={{ color: "#4B5563" }}>
-              <div className="flex justify-between"><span>Plan</span><span style={{ color: "#16232E" }}>{confirm.name} ({confirm.doc_limit == null ? "unlimited documents" : `up to ${confirm.doc_limit}`})</span></div>
+              <div className="flex justify-between"><span>Plan</span><span style={{ color: "#16232E" }}>{confirm.plan.name} ({confirm.plan.doc_limit == null ? "unlimited documents" : `up to ${confirm.plan.doc_limit}`})</span></div>
               <div className="flex justify-between"><span>Length</span><span style={{ color: "#16232E" }}>{months === 1 ? "1 month" : `${months} months`}</span></div>
-              <div className="flex justify-between"><span>Total</span><span className="font-medium" style={{ color: "#16232E" }}>{rupees(totalFor(confirm, months))}</span></div>
+              <div className="flex justify-between"><span>Runs until</span><span style={{ color: "#16232E" }}>{dateFmt(addMonths(months))}</span></div>
+              <div className="flex justify-between"><span>Price</span><span style={{ color: "#16232E" }}>{rupees(confirm.quote.out_price)}</span></div>
+              {confirm.quote.out_credit > 0 && (
+                <div className="flex justify-between"><span>Credit for unused time</span><span style={{ color: "#16232E" }}>−{rupees(confirm.quote.out_credit)}</span></div>
+              )}
+              <div className="flex justify-between font-medium"><span>You pay</span><span style={{ color: "#16232E" }}>{rupees(confirm.quote.out_amount)}</span></div>
             </div>
+            {confirm.quote.out_docs_over > 0 && (
+              <p className="text-xs mb-3" style={{ color: "#B5750A" }}>
+                You have more documents than this plan allows. Until you delete {confirm.quote.out_docs_over}, you won't be able to add documents, expiry dates will be hidden and reminders will be paused.
+              </p>
+            )}
             {months > 1 && (
               <p className="text-xs mb-3" style={{ color: "#6B7280" }}>6- and 12-month plans are prepaid and non-refundable.</p>
             )}
