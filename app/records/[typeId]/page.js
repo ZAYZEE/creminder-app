@@ -12,6 +12,7 @@ export default function RecordsOfType() {
   const [type, setType] = useState(null);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [overLimit, setOverLimit] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
   const [editRecord, setEditRecord] = useState(null); // { id, name }
@@ -20,6 +21,8 @@ export default function RecordsOfType() {
   const load = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.replace("/login"); return; }
+    const { data: st } = await supabase.rpc("get_org_status");
+    setOverLimit(!!(st && st[0] && st[0].over_limit));
     const { data: t } = await supabase.from("record_types").select("id, name").eq("id", typeId).single();
     setType(t);
     const { data: r } = await supabase
@@ -79,7 +82,7 @@ export default function RecordsOfType() {
                       <div className="text-xs mt-0.5" style={{ color: "#9CA3AF" }}>{r.document_categories?.length || 0} categories · {docCount} documents</div>
                     </button>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
-                      {worst !== "ok" && <Badge status={worst} />}
+                      {!overLimit && worst !== "ok" && <Badge status={worst} />}
                       <button onClick={() => setEditRecord({ id: r.id, name: r.name })} className="text-gray-300 hover:text-gray-600 transition"><Pencil size={13} /></button>
                       <button onClick={() => setConfirmDelete({ id: r.id, name: r.name, catCount: r.document_categories?.length || 0 })} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={13} /></button>
                     </div>
