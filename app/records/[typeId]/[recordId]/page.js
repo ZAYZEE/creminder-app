@@ -12,6 +12,7 @@ export default function RecordDetail() {
   const [record, setRecord] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [overLimit, setOverLimit] = useState(false);
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [addDocFor, setAddDocFor] = useState(null); // { categoryId, categoryName }
@@ -23,6 +24,8 @@ export default function RecordDetail() {
   const load = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.replace("/login"); return; }
+    const { data: st } = await supabase.rpc("get_org_status");
+    setOverLimit(!!(st && st[0] && st[0].over_limit));
     const { data: r } = await supabase.from("records").select("id, name, record_types ( name )").eq("id", recordId).single();
     setRecord(r);
     const { data: c } = await supabase
@@ -100,8 +103,8 @@ export default function RecordDetail() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setAddDocFor({ categoryId: c.id, categoryName: c.name })}
-                    className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium" style={{ backgroundColor: "#D9A44120", color: "#8A5D00" }}>
+                  <button onClick={() => setAddDocFor({ categoryId: c.id, categoryName: c.name })} disabled={overLimit} title={overLimit ? "You're over your plan's document limit" : undefined}
+                    className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium disabled:opacity-40" style={{ backgroundColor: "#D9A44120", color: "#8A5D00" }}>
                     <PlusCircle size={12} /> Add document
                   </button>
                   <button onClick={() => setRecipientsFor(recipientsFor === c.id ? null : c.id)}
@@ -124,9 +127,13 @@ export default function RecordDetail() {
                       <li key={d.id} className="flex items-center justify-between px-5 py-3 border-b last:border-0" style={{ borderColor: "#F0EFE9" }}>
                         <div className="flex items-center gap-2.5"><FileText size={14} color="#9CA3AF" /><span className="text-sm" style={{ color: "#16232E" }}>{d.name}</span></div>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs" style={{ color: "#6B7280" }}>{d.expiry_date ? fmt(d.expiry_date) : "No expiry"}</span>
+                          {!overLimit && (
+                            <>
+                              <span className="text-xs" style={{ color: "#6B7280" }}>{d.expiry_date ? fmt(d.expiry_date) : "No expiry"}</span>
                           <Badge status={status} />
                           <button onClick={() => setEditDoc(d)} className="text-gray-300 hover:text-gray-600 transition"><Pencil size={13} /></button>
+                            </>
+                          )}
                           <button onClick={() => setConfirmDelete({ type: "document", id: d.id, label: d.name, filePath: d.file_path })} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={13} /></button>
                         </div>
                       </li>
