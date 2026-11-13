@@ -99,7 +99,7 @@ export default function Upgrade() {
 
           {running && (
             <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: "#F5F5F1", color: "#4B5563" }}>
-              Your {status.plan_name} plan runs until {dateFmt(runningEnd)}. Renewing or moving to a higher plan starts a fresh period today, and the unused time on your current plan is credited against the price. A lower plan can be chosen once the current one ends.
+              Your {status.plan_name} plan runs until {dateFmt(runningEnd)}. Moving to a bigger plan starts a fresh period today, and the unused time on your current plan is credited against the price. Renewing, or choosing a smaller plan, opens once your current plan ends.
             </div>
           )}
 
@@ -159,12 +159,12 @@ export default function Upgrade() {
               const perMonth = price != null ? Math.round(price / months) : 0;
               const isCurrent = running && status.plan_id === plan.id;
               const disabled = !isOwner || !ok;
-              const label = !running ? "Choose plan" : isCurrent ? "Renew now" : "Upgrade now";
+              const label = !running ? "Choose plan" : "Upgrade now";
               return (
                 <div key={plan.id} className="bg-white rounded-xl border p-5 flex flex-col" style={{ borderColor: isCurrent ? "#D9A441" : "#E4E2D8" }}>
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium text-sm" style={{ color: "#16232E" }}>{plan.name}</h3>
-                    {isCurrent && <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: "#D9A44120", color: "#8A5D00" }}>Current</span>}
+                    {isCurrent && <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: "#D9A44120", color: "#8A5D00" }}>Current · until {dateFmt(runningEnd)}</span>}
                   </div>
                   <div className="text-xs mt-1" style={{ color: "#6B7280" }}>
                     {plan.doc_limit == null ? "Unlimited documents" : `Up to ${plan.doc_limit} documents`}
