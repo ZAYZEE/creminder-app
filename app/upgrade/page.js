@@ -157,7 +157,13 @@ export default function Upgrade() {
               const ok = q ? q.out_ok : false;
               const save = price != null ? plan.monthly_price * months - price : 0;
               const perMonth = price != null ? Math.round(price / months) : 0;
-              const isCurrent = running && status.plan_id === plan.id;
+              const sameTier = running && status.plan_id === plan.id;
+              // "Current" marks the one tier-and-length combination they are actually on.
+              // (A plan set by hand has no recorded length, so only then is the tier marked on every tab.)
+              const isCurrent = sameTier && (status.plan_months == null || status.plan_months === months);
+              const reasonText = sameTier
+                ? (isCurrent ? "This is your current plan. It can be renewed once it ends." : "You're already on this plan. Its length can be changed once it ends.")
+                : q?.out_reason;
               const disabled = !isOwner || !ok;
               const label = !running ? "Choose plan" : "Upgrade now";
               return (
@@ -183,7 +189,7 @@ export default function Upgrade() {
                     </div>
                   )}
                   {q && !ok && (
-                    <div className="text-xs mt-2" style={{ color: "#6B7280" }}>{q.out_reason}</div>
+                    <div className="text-xs mt-2" style={{ color: "#6B7280" }}>{reasonText}</div>
                   )}
                   {q && ok && q.out_docs_over > 0 && (
                     <div className="text-xs mt-2 flex items-start gap-1" style={{ color: "#B5750A" }}>
