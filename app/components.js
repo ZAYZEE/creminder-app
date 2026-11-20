@@ -53,6 +53,7 @@ export function Shell({ children, title, subtitle }) {
   const sidebarNote = !status || status.is_upgraded ? null
     : locked ? (hadPlan ? "Plan ended — renew to continue" : "Trial ended — upgrade to continue")
     : overLimit ? "Over your plan's document limit"
+    : status.plan_active && new Date(status.plan_ends_at) <= Date.now() ? "Plan expired · grace period. Access continues for a short time."
     : status.plan_active ? `${status.plan_name} plan · ${daysLeft(status.plan_ends_at)} day${daysLeft(status.plan_ends_at) !== 1 ? "s" : ""} left`
     : `${daysLeft(status.trial_ends_at)} day${daysLeft(status.trial_ends_at) !== 1 ? "s" : ""} left in trial`;
 
