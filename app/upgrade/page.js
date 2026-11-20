@@ -72,7 +72,7 @@ export default function Upgrade() {
   const running = !!(status && status.plan_active);
   const runningEnd = running ? new Date(status.plan_ends_at) : null;
   const inGrace = running && runningEnd <= new Date();
-  const periodAllowed = (m) => !running || addMonths(m) >= runningEnd;
+  const periodAllowed = (m) => !running || (status.plan_months ? m >= status.plan_months : addMonths(m) >= runningEnd);
 
   const submit = async () => {
     setSubmitting(true);
@@ -100,7 +100,7 @@ export default function Upgrade() {
 
           {running && (
             <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: "#F5F5F1", color: "#4B5563" }}>
-              Your {status.plan_name} plan {inGrace ? "has expired (grace period)" : `runs until ${dateFmt(runningEnd)}`}. Moving to a bigger plan starts a fresh period today, and the unused time on your current plan is credited against the price. Renewing, or choosing a smaller plan, opens once your current plan ends.
+              Your {status.plan_name} plan {inGrace ? "has expired (grace period)" : `runs until ${dateFmt(runningEnd)}`}. You can move to a bigger plan with a period at least as long as your current plan's. It starts a fresh period today, and the unused time on your current plan is credited against the price. Renewing, or choosing a smaller plan, opens once your current plan ends.
             </div>
           )}
 
@@ -139,7 +139,7 @@ export default function Upgrade() {
               const allowed = periodAllowed(m);
               return (
                 <button key={m} disabled={!allowed} onClick={() => setMonths(m)}
-                  title={allowed ? undefined : "Too short: the new plan must run at least until your current plan ends"}
+                  title={allowed ? undefined : `Too short: the new plan's period must be at least as long as your current plan's${status.plan_months ? ` (${status.plan_months} month${status.plan_months === 1 ? "" : "s"})` : ""}`}
                   className="text-sm px-4 py-2 rounded-full border transition disabled:opacity-40"
                   style={{ borderColor: active ? "#16232E" : "#E4E2D8", backgroundColor: active ? "#16232E" : "white", color: active ? "white" : "#4B5563" }}>
                   {m === 1 ? "Monthly" : `${m} months`}
