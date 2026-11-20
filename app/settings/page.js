@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Shell } from "../components";
+import { Shell, useLock } from "../components";
+import { lockText } from "@/lib/lockInfo";
 import { PlusCircle, X, Users, Copy, Check, UserMinus, AlertTriangle } from "lucide-react";
 
 export default function Settings() {
@@ -15,6 +16,9 @@ export default function Settings() {
   const [copiedId, setCopiedId] = useState(null);
   const [members, setMembers] = useState([]);
   const [status, setStatus] = useState(null); // from get_org_status()
+  const { lock } = useLock();
+  const lockMsg = lockText(lock, status);
+  const locked = !!(status && !status.is_active);
   const [confirmRemove, setConfirmRemove] = useState(null); // { user_id, email }
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -121,6 +125,10 @@ export default function Settings() {
       planDetail = inGrace
         ? `Expired on ${fmtDate(status.plan_ends_at)}. Access continues for a short time.`
         : `Active until ${fmtDate(status.plan_ends_at)} · ${plural(daysLeft(status.plan_ends_at), "day")} left`;
+      if (status.over_limit) {
+        planLocked = true;
+        planDetail = `Locked: over this plan's document limit. Active until ${fmtDate(status.plan_ends_at)}.`;
+      }
       if (status.doc_limit == null) {
         usageText = `${plural(status.docs_used, "document")} tracked · no limit on this plan`;
       } else {
@@ -128,7 +136,7 @@ export default function Settings() {
         usageText = `${status.docs_used} of ${status.doc_limit} documents used`;
         if (status.docs_used > status.doc_limit) {
           usageColor = "#B3261E";
-          usageWarning = `You're over this plan's limit by ${status.docs_used - status.doc_limit}. Delete that many or move to a bigger plan; reminders and expiry dates are paused until then.`;
+          usageWarning = `You're over this plan's limit by ${status.docs_used - status.doc_limit}. Your account stays locked until you delete that many or move to a bigger plan.`;
         } else if (status.docs_used >= status.doc_limit) {
           usageColor = "#B3261E";
           usageWarning = "You've reached this plan's document limit. Move to a higher plan to add more.";
@@ -141,7 +149,7 @@ export default function Settings() {
       planTitle = "Free trial";
       planDetail = `Ends ${fmtDate(status.trial_ends_at)} · ${plural(daysLeft(status.trial_ends_at), "day")} left`;
       usageText = `${plural(status.docs_used, "document")} added · no limit during the trial`;
-    } else if (status.plan_id) {
+    } else if (status.plan_id && status.plan_ends_at) {
       planLocked = true;
       planTitle = `${status.plan_name} plan ended`;
       planDetail = `Ended on ${fmtDate(status.plan_ends_at)}. Everything you've added is safe and paused until you renew.`;
@@ -149,7 +157,9 @@ export default function Settings() {
     } else {
       planLocked = true;
       planTitle = "Free trial ended";
-      planDetail = `Ended on ${fmtDate(status.trial_ends_at)}. Everything you've added is safe and paused until you upgrade.`;
+      planDetail = lock && lock.kind === "trial"
+        ? `Ended on ${fmtDate(status.trial_ends_at)}. ${lockMsg.body}`
+        : `Ended on ${fmtDate(status.trial_ends_at)}. Everything you've added is safe and paused until you upgrade.`;
       usageText = `${plural(status.docs_used, "document")} saved`;
     }
   }
@@ -187,7 +197,7 @@ export default function Settings() {
         )}
 
         {/* Team section — only rendered for owners at all. Members never see this section, not even a placeholder message. */}
-        {isOwner && (
+        {isOwner && !locked && (
           <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
             <h2 className="font-medium text-sm mb-1 flex items-center gap-2" style={{ color: "#16232E" }}><Users size={15} /> Team</h2>
             <p className="text-xs mb-4" style={{ color: "#9CA3AF" }}>
