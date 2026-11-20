@@ -195,7 +195,7 @@ export default function Upgrade() {
                   {q && ok && q.out_docs_over > 0 && (
                     <div className="text-xs mt-2 flex items-start gap-1" style={{ color: "#B5750A" }}>
                       <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                      You have {status?.docs_used} documents and this plan allows {plan.doc_limit}. You'd need to delete {q.out_docs_over} before reminders resume.
+                      You have {status?.docs_used} documents and this plan allows {plan.doc_limit}. Your account stays locked until you delete {q.out_docs_over}. While locked, you can only view names and delete.
                     </div>
                   )}
                   <button disabled={disabled} onClick={() => { setError(""); setConfirm({ plan, quote: q }); }}
@@ -233,7 +233,7 @@ export default function Upgrade() {
             </div>
             {confirm.quote.out_docs_over > 0 && (
               <p className="text-xs mb-3" style={{ color: "#B5750A" }}>
-                You have more documents than this plan allows. Until you delete {confirm.quote.out_docs_over}, you won't be able to add documents, expiry dates will be hidden and reminders will be paused.
+                You have more documents than this plan allows. Until you delete {confirm.quote.out_docs_over}, your account stays locked and you can only view names and delete. Your plan still starts on payment.
               </p>
             )}
             {months > 1 && (
