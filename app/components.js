@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { LayoutGrid, Users, Settings, ShieldCheck, AlertTriangle, Clock } from "lucide-react";
 import { statusMeta } from "@/lib/supabase-helpers";
 import { supabase } from "@/lib/supabase";
+import { lockInfo, lockText } from "@/lib/lockInfo";
 
 export function Badge({ status }) {
   const m = statusMeta[status];
@@ -16,10 +17,30 @@ export function Badge({ status }) {
   );
 }
 
+// Loads the account status once and works out whether (and why) the account is locked
+export function useLock() {
+  const [state, setState] = useState({ status: null, lock: null });
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase.rpc("get_org_status");
+      const st = data && data[0] ? data[0] : null;
+      let deletionDate = null;
+      if (st && !st.is_active) {
+        const r = await supabase.rpc("get_trial_deletion_date");
+        deletionDate = r.data || null;
+      }
+      setState({ status: st, lock: lockInfo(st, deletionDate) });
+    })();
+  }, []);
+  return state;
+}
+
 export function Shell({ children, title, subtitle }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [status, setStatus] = useState(null); // from get_org_status()
+  const { status, lock } = useLock();
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
     { href: "/records", label: "Records", icon: Users },
@@ -37,22 +58,11 @@ export function Shell({ children, title, subtitle }) {
     return () => window.removeEventListener("pageshow", checkSession);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data } = await supabase.rpc("get_org_status");
-      if (data && data[0]) setStatus(data[0]);
-    })();
-  }, []);
-
   const daysLeft = (iso) => Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 86400000));
-  const locked = status && !status.is_active;
-  const hadPlan = status && status.plan_id;
-  const overLimit = status && status.is_active && status.over_limit;
+  const locked = !!lock;
+  const lockMsg = lockText(lock, status);
   const sidebarNote = !status || status.is_upgraded ? null
-    : locked ? (hadPlan ? "Plan ended — renew to continue" : "Trial ended — upgrade to continue")
-    : overLimit ? "Over your plan's document limit"
+    : lockMsg ? lockMsg.short
     : status.plan_active && new Date(status.plan_ends_at) <= Date.now() ? "Plan expired · grace period. Access continues for a short time."
     : status.plan_active ? `${status.plan_name} plan · ${daysLeft(status.plan_ends_at)} day${daysLeft(status.plan_ends_at) !== 1 ? "s" : ""} left`
     : `${daysLeft(status.trial_ends_at)} day${daysLeft(status.trial_ends_at) !== 1 ? "s" : ""} left in trial`;
@@ -84,7 +94,7 @@ export function Shell({ children, title, subtitle }) {
         </nav>
         {sidebarNote && (
           <button onClick={() => router.push("/upgrade")} className="mx-3 mb-4 px-3 py-2.5 rounded-lg text-xs text-left hover:opacity-80 transition"
-            style={{ backgroundColor: (locked || overLimit) ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: (locked || overLimit) ? "#F87171" : "#D9A441" }}>
+            style={{ backgroundColor: locked ? "rgba(179,38,30,0.15)" : "rgba(217,164,65,0.1)", color: locked ? "#F87171" : "#D9A441" }}>
             {sidebarNote}
             <span className="block mt-0.5 underline">View plans</span>
           </button>
@@ -96,19 +106,10 @@ export function Shell({ children, title, subtitle }) {
           {subtitle && <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{subtitle}</p>}
         </header>
         <div className="flex-1 overflow-auto px-8 py-6">
-          {locked && (
+          {lockMsg && (
             <div className="mb-4 px-4 py-3 rounded-lg text-sm flex items-center gap-2" style={{ backgroundColor: "#FBEAE9", color: "#B3261E" }}>
-              <AlertTriangle size={15} />
-              {hadPlan
-                ? "Your plan has ended. Renew to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you renew."
-                : "Your trial has ended. Upgrade to pick up right where you left off — everything you've added is safely saved and nothing is lost, but it stays paused until you upgrade."}
-              <button onClick={() => router.push("/upgrade")} className="ml-auto shrink-0 underline font-medium">View plans</button>
-            </div>
-          )}
-          {overLimit && (
-            <div className="mb-4 px-4 py-3 rounded-lg text-sm flex items-center gap-2" style={{ backgroundColor: "#FBEAE9", color: "#B3261E" }}>
-              <AlertTriangle size={15} />
-              {`You have ${status.docs_used} documents, but your ${status.plan_name} plan allows ${status.doc_limit}. Reminders are paused and expiry dates are hidden until you delete ${status.docs_used - status.doc_limit} or move to a bigger plan.`}
+              <AlertTriangle size={15} className="shrink-0" />
+              <span><span className="font-medium">{lockMsg.title}.</span> {lockMsg.body}</span>
               <button onClick={() => router.push("/upgrade")} className="ml-auto shrink-0 underline font-medium">View plans</button>
             </div>
           )}
