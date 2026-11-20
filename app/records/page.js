@@ -9,6 +9,7 @@ export default function RecordTypes() {
   const router = useRouter();
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
   const [editType, setEditType] = useState(null); // { id, name }
@@ -17,6 +18,8 @@ export default function RecordTypes() {
   const load = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.replace("/login"); return; }
+    const { data: st } = await supabase.rpc("get_org_status");
+    setLocked(!!(st && st[0] && !st[0].is_active));
     const { data } = await supabase
       .from("record_types")
       .select("id, name, records ( id, document_categories ( id, documents ( id ) ) )")
@@ -52,9 +55,11 @@ export default function RecordTypes() {
         <p className="text-sm" style={{ color: "#9CA3AF" }}>Loading…</p>
       ) : (
         <div className="space-y-4">
-          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg font-medium" style={{ backgroundColor: "#D9A441", color: "#16232E" }}>
-            <PlusCircle size={15} /> Add record type
-          </button>
+          {!locked && (
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg font-medium" style={{ backgroundColor: "#D9A441", color: "#16232E" }}>
+              <PlusCircle size={15} /> Add record type
+            </button>
+          )}
           <div className="grid grid-cols-3 gap-3">
             {types.map((t) => {
               const recordCount = t.records?.length || 0;
@@ -70,14 +75,14 @@ export default function RecordTypes() {
                       </div>
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => setEditType({ id: t.id, name: t.name })} className="text-gray-300 hover:text-gray-600 transition"><Pencil size={13} /></button>
+                      {!locked && <button onClick={() => setEditType({ id: t.id, name: t.name })} className="text-gray-300 hover:text-gray-600 transition"><Pencil size={13} /></button>}
                       <button onClick={() => setConfirmDelete({ id: t.id, name: t.name, recordCount })} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={13} /></button>
                     </div>
                   </div>
                 </div>
               );
             })}
-            {types.length === 0 && <div className="col-span-3 text-center py-10 text-sm" style={{ color: "#9CA3AF" }}>No record types yet — add your first one.</div>}
+            {types.length === 0 && <div className="col-span-3 text-center py-10 text-sm" style={{ color: "#9CA3AF" }}>{locked ? "No record types." : "No record types yet — add your first one."}</div>}
           </div>
         </div>
       )}
