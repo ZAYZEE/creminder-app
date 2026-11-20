@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Shell, Badge } from "../components";
+import { Shell, Badge, useLock } from "../components";
+import { lockText } from "@/lib/lockInfo";
 import { statusOf, fmt } from "@/lib/supabase-helpers";
 import { AlertTriangle, Clock, Bell, Check, ChevronRight } from "lucide-react";
 
@@ -11,16 +12,17 @@ export default function Dashboard() {
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null);
+  const { lock } = useLock();
 
   useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.replace("/login");
 
-      // Over the plan's document limit: dates stay hidden, so don't even load them
+      // Locked account: dates stay hidden, so don't even load them
       const { data: st } = await supabase.rpc("get_org_status");
       if (st && st[0]) setStatus(st[0]);
-      if (st && st[0] && st[0].over_limit) { setLoading(false); return; }
+      if (st && st[0] && !st[0].is_active) { setLoading(false); return; }
 
       // Pull every document with its parent category/record/type names in one query
       const { data, error } = await supabase
@@ -69,16 +71,16 @@ export default function Dashboard() {
     </div>
   );
 
-  if (status && status.over_limit) {
+  if (status && !status.is_active) {
+    const msg = lockText(lock, status);
     return (
-      <Shell title="Dashboard" subtitle="Over your plan's document limit">
+      <Shell title="Dashboard" subtitle="Your account is locked">
         <div className="bg-white rounded-xl border p-6 max-w-xl" style={{ borderColor: "#F3C9C6" }}>
-          <h2 className="font-medium text-sm mb-2" style={{ color: "#B3261E" }}>Your dashboard is paused</h2>
-          <p className="text-sm mb-1" style={{ color: "#4B5563" }}>You have {status.docs_used} documents, but your {status.plan_name} plan allows {status.doc_limit}.</p>
-          <p className="text-sm mb-4" style={{ color: "#6B7280" }}>Expiry dates and reminders are paused until you delete {status.docs_used - status.doc_limit} or move to a bigger plan. Nothing has been lost.</p>
+          <h2 className="font-medium text-sm mb-2" style={{ color: "#B3261E" }}>{msg ? msg.title : "Your dashboard is paused"}</h2>
+          <p className="text-sm mb-4" style={{ color: "#4B5563" }}>{msg ? msg.body : "Your account is locked. Nothing has been lost."}</p>
           <div className="flex gap-2">
-            <button onClick={() => router.push("/records")} className="text-xs font-medium px-3 py-2 rounded-lg" style={{ backgroundColor: "#16232E", color: "white" }}>Go to records to delete</button>
-            <button onClick={() => router.push("/upgrade")} className="text-xs font-medium px-3 py-2 rounded-lg border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>View plans</button>
+            <button onClick={() => router.push("/upgrade")} className="text-xs font-medium px-3 py-2 rounded-lg" style={{ backgroundColor: "#16232E", color: "white" }}>View plans</button>
+            <button onClick={() => router.push("/records")} className="text-xs font-medium px-3 py-2 rounded-lg border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>Go to records to delete</button>
           </div>
         </div>
       </Shell>
