@@ -116,8 +116,11 @@ export default function Settings() {
       planDetail = "No expiry date or document limit on this account.";
       usageText = `${plural(status.docs_used, "document")} tracked`;
     } else if (status.plan_active) {
-      planTitle = `${status.plan_name} plan`;
-      planDetail = `Active until ${fmtDate(status.plan_ends_at)} · ${plural(daysLeft(status.plan_ends_at), "day")} left`;
+      const inGrace = new Date(status.plan_ends_at) <= Date.now();
+      planTitle = inGrace ? `${status.plan_name} plan expired · grace period` : `${status.plan_name} plan`;
+      planDetail = inGrace
+        ? `Expired on ${fmtDate(status.plan_ends_at)}. Access continues for a short time.`
+        : `Active until ${fmtDate(status.plan_ends_at)} · ${plural(daysLeft(status.plan_ends_at), "day")} left`;
       if (status.doc_limit == null) {
         usageText = `${plural(status.docs_used, "document")} tracked · no limit on this plan`;
       } else {
