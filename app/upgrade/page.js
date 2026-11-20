@@ -100,7 +100,7 @@ export default function Upgrade() {
 
           {running && (
             <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: "#F5F5F1", color: "#4B5563" }}>
-              Your {status.plan_name} plan {inGrace ? "has expired (grace period)" : `runs until ${dateFmt(runningEnd)}`}. You can move to a bigger plan with a period at least as long as your current plan's. It starts a fresh period today, and the unused time on your current plan is credited against the price. Renewing, or choosing a smaller plan, opens once your current plan ends.
+              Your {status.plan_name} plan {inGrace ? "has expired (grace period)" : `runs until ${dateFmt(runningEnd)}`}. You can move to a bigger plan with a period at least as long as your current plan's. It starts a fresh period today, and the unused days on your current plan are credited against the price (only fully completed days count as used). Renewing, or choosing a smaller plan, opens once your current plan ends.
             </div>
           )}
 
@@ -185,7 +185,7 @@ export default function Upgrade() {
                   </div>
                   {ok && credit > 0 && (
                     <div className="text-xs mt-1" style={{ color: "#4B5563" }}>
-                      Less credit for unused time: −{rupees(credit)}
+                      Less credit for unused days: −{rupees(credit)}
                       <div className="text-sm font-medium mt-0.5" style={{ color: "#16232E" }}>You pay {rupees(pay)}</div>
                     </div>
                   )}
@@ -227,7 +227,7 @@ export default function Upgrade() {
               <div className="flex justify-between"><span>Runs until</span><span style={{ color: "#16232E" }}>{dateFmt(addMonths(months))}</span></div>
               <div className="flex justify-between"><span>Price</span><span style={{ color: "#16232E" }}>{rupees(confirm.quote.out_price)}</span></div>
               {confirm.quote.out_credit > 0 && (
-                <div className="flex justify-between"><span>Credit for unused time</span><span style={{ color: "#16232E" }}>−{rupees(confirm.quote.out_credit)}</span></div>
+                <div className="flex justify-between"><span>Credit for unused days</span><span style={{ color: "#16232E" }}>−{rupees(confirm.quote.out_credit)}</span></div>
               )}
               <div className="flex justify-between font-medium"><span>You pay</span><span style={{ color: "#16232E" }}>{rupees(confirm.quote.out_amount)}</span></div>
             </div>
