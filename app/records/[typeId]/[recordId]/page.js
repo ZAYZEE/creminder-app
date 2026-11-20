@@ -12,7 +12,7 @@ export default function RecordDetail() {
   const [record, setRecord] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [overLimit, setOverLimit] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [addDocFor, setAddDocFor] = useState(null); // { categoryId, categoryName }
@@ -25,7 +25,7 @@ export default function RecordDetail() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.replace("/login"); return; }
     const { data: st } = await supabase.rpc("get_org_status");
-    setOverLimit(!!(st && st[0] && st[0].over_limit));
+    setLocked(!!(st && st[0] && !st[0].is_active));
     const { data: r } = await supabase.from("records").select("id, name, record_types ( name )").eq("id", recordId).single();
     setRecord(r);
     const { data: c } = await supabase
@@ -103,22 +103,26 @@ export default function RecordDetail() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setAddDocFor({ categoryId: c.id, categoryName: c.name })} disabled={overLimit} title={overLimit ? "You're over your plan's document limit" : undefined}
-                    className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium disabled:opacity-40" style={{ backgroundColor: "#D9A44120", color: "#8A5D00" }}>
-                    <PlusCircle size={12} /> Add document
-                  </button>
-                  <button onClick={() => setRecipientsFor(recipientsFor === c.id ? null : c.id)}
-                    className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>
-                    <Mail size={12} /> {c.category_recipients?.length || 0} recipient{c.category_recipients?.length !== 1 ? "s" : ""}
-                  </button>
-                  {editCategory !== c.id && (
+                  {!locked && (
+                    <>
+                      <button onClick={() => setAddDocFor({ categoryId: c.id, categoryName: c.name })}
+                        className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium" style={{ backgroundColor: "#D9A44120", color: "#8A5D00" }}>
+                        <PlusCircle size={12} /> Add document
+                      </button>
+                      <button onClick={() => setRecipientsFor(recipientsFor === c.id ? null : c.id)}
+                        className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium border" style={{ borderColor: "#E4E2D8", color: "#4B5563" }}>
+                        <Mail size={12} /> {c.category_recipients?.length || 0} recipient{c.category_recipients?.length !== 1 ? "s" : ""}
+                      </button>
+                    </>
+                  )}
+                  {!locked && editCategory !== c.id && (
                     <button onClick={() => setEditCategory(c.id)} className="text-gray-300 hover:text-gray-600 transition"><Pencil size={13} /></button>
                   )}
                   <button onClick={() => setConfirmDelete({ type: "category", id: c.id, label: c.name })} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={13} /></button>
                 </div>
               </div>
               {(!c.documents || c.documents.length === 0) ? (
-                <div className="px-5 py-6 text-center text-xs" style={{ color: "#9CA3AF" }}>No documents in this category yet.</div>
+                <div className="px-5 py-6 text-center text-xs" style={{ color: "#9CA3AF" }}>{locked ? "No documents in this category." : "No documents in this category yet."}</div>
               ) : (
                 <ul>
                   {c.documents.map((d) => {
@@ -127,7 +131,7 @@ export default function RecordDetail() {
                       <li key={d.id} className="flex items-center justify-between px-5 py-3 border-b last:border-0" style={{ borderColor: "#F0EFE9" }}>
                         <div className="flex items-center gap-2.5"><FileText size={14} color="#9CA3AF" /><span className="text-sm" style={{ color: "#16232E" }}>{d.name}</span></div>
                         <div className="flex items-center gap-3">
-                          {!overLimit && (
+                          {!locked && (
                             <>
                               <span className="text-xs" style={{ color: "#6B7280" }}>{d.expiry_date ? fmt(d.expiry_date) : "No expiry"}</span>
                           <Badge status={status} />
@@ -141,13 +145,13 @@ export default function RecordDetail() {
                   })}
                 </ul>
               )}
-              {recipientsFor === c.id && (
+              {!locked && recipientsFor === c.id && (
                 <RecipientsPanel category={c} onAdd={addRecipient} onRemove={removeRecipient} />
               )}
             </div>
           ))}
 
-          {addingCategory ? (
+          {locked ? null : addingCategory ? (
             <div className="bg-white rounded-xl border p-4 flex items-center gap-2" style={{ borderColor: "#D9A441" }}>
               <input autoFocus value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="e.g. License, Certification, Insurance…"
                 className="flex-1 text-sm outline-none border rounded-lg px-3 py-2" style={{ borderColor: "#E4E2D8" }}
