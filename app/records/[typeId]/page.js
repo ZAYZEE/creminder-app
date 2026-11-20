@@ -12,7 +12,7 @@ export default function RecordsOfType() {
   const [type, setType] = useState(null);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [overLimit, setOverLimit] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
   const [editRecord, setEditRecord] = useState(null); // { id, name }
@@ -22,7 +22,7 @@ export default function RecordsOfType() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.replace("/login"); return; }
     const { data: st } = await supabase.rpc("get_org_status");
-    setOverLimit(!!(st && st[0] && st[0].over_limit));
+    setLocked(!!(st && st[0] && !st[0].is_active));
     const { data: t } = await supabase.from("record_types").select("id, name").eq("id", typeId).single();
     setType(t);
     const { data: r } = await supabase
@@ -66,9 +66,11 @@ export default function RecordsOfType() {
         <p className="text-sm" style={{ color: "#9CA3AF" }}>Loading…</p>
       ) : (
         <div className="space-y-4">
-          <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg font-medium" style={{ backgroundColor: "#D9A441", color: "#16232E" }}>
-            <PlusCircle size={15} /> Add {type?.name?.toLowerCase()} record
-          </button>
+          {!locked && (
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg font-medium" style={{ backgroundColor: "#D9A441", color: "#16232E" }}>
+              <PlusCircle size={15} /> Add {type?.name?.toLowerCase()} record
+            </button>
+          )}
           <div className="grid grid-cols-2 gap-3">
             {records.map((r) => {
               const docCount = r.document_categories?.reduce((s, c) => s + (c.documents?.length || 0), 0) || 0;
@@ -82,15 +84,15 @@ export default function RecordsOfType() {
                       <div className="text-xs mt-0.5" style={{ color: "#9CA3AF" }}>{r.document_categories?.length || 0} categories · {docCount} documents</div>
                     </button>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
-                      {!overLimit && worst !== "ok" && <Badge status={worst} />}
-                      <button onClick={() => setEditRecord({ id: r.id, name: r.name })} className="text-gray-300 hover:text-gray-600 transition"><Pencil size={13} /></button>
+                      {!locked && worst !== "ok" && <Badge status={worst} />}
+                      {!locked && <button onClick={() => setEditRecord({ id: r.id, name: r.name })} className="text-gray-300 hover:text-gray-600 transition"><Pencil size={13} /></button>}
                       <button onClick={() => setConfirmDelete({ id: r.id, name: r.name, catCount: r.document_categories?.length || 0 })} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={13} /></button>
                     </div>
                   </div>
                 </div>
               );
             })}
-            {records.length === 0 && <div className="col-span-2 text-center py-10 text-sm" style={{ color: "#9CA3AF" }}>No {type?.name?.toLowerCase()} records yet.</div>}
+            {records.length === 0 && <div className="col-span-2 text-center py-10 text-sm" style={{ color: "#9CA3AF" }}>{locked ? "No records." : `No ${type?.name?.toLowerCase()} records yet.`}</div>}
           </div>
         </div>
       )}
