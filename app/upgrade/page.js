@@ -157,7 +157,7 @@ export default function Upgrade() {
               const pay = q ? q.out_amount : null;
               const ok = q ? q.out_ok : false;
               const save = price != null ? plan.monthly_price * months - price : 0;
-              const perMonth = price != null ? Math.round(price / months) : 0;
+              const perMonth = price != null ? Math.floor(price / months) : 0;
               const sameTier = running && status.plan_id === plan.id;
               // "Current" marks the one tier-and-length combination they are actually on.
               // (A plan set by hand has no recorded length, so only then is the tier marked on every tab.)
