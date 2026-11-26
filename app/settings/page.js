@@ -16,6 +16,7 @@ export default function Settings() {
   const [copiedId, setCopiedId] = useState(null);
   const [members, setMembers] = useState([]);
   const [status, setStatus] = useState(null); // from get_org_status()
+  const [renewal, setRenewal] = useState(null); // a renewal waiting to start, if any
   const { lock } = useLock();
   const lockMsg = lockText(lock, status);
   const locked = !!(status && !status.is_active);
@@ -37,6 +38,8 @@ export default function Settings() {
 
     const { data: st } = await supabase.rpc("get_org_status");
     if (st && st[0]) setStatus(st[0]);
+    const { data: rv } = await supabase.rpc("get_renewal_info");
+    setRenewal(rv && rv[0] ? rv[0] : null);
 
     if (member?.role === "owner") {
       const { data: inv } = await supabase.from("invites").select("id, code, revoked, created_at").eq("org_id", member?.org_id).order("created_at", { ascending: false });
@@ -128,6 +131,15 @@ export default function Settings() {
       if (status.over_limit) {
         planLocked = true;
         planDetail = `Locked: over this plan's document limit. Active until ${fmtDate(status.plan_ends_at)}.`;
+      }
+      if (renewal && renewal.has_queued) {
+        const rm = renewal.next_months === 1 ? "1 month" : `${renewal.next_months} months`;
+        if (inGrace) {
+          planTitle = `${status.plan_name} plan ended · renewal starting shortly`;
+          planDetail = `Your ${renewal.next_plan_name} renewal (${rm}) starts automatically.`;
+        } else {
+          planDetail += ` · Renewal: ${renewal.next_plan_name}, ${rm}, starts when this plan ends`;
+        }
       }
       if (status.doc_limit == null) {
         usageText = `${plural(status.docs_used, "document")} tracked · no limit on this plan`;
