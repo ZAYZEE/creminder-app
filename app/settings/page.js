@@ -164,7 +164,9 @@ export default function Settings() {
     } else if (status.plan_id && status.plan_ends_at) {
       planLocked = true;
       planTitle = `${status.plan_name} plan ended`;
-      planDetail = `Ended on ${fmtDate(status.plan_ends_at)}. Everything you've added is safe and paused until you renew.`;
+      planDetail = lock && lock.kind === "ended" && lock.deletionDate
+        ? `Ended on ${fmtDate(status.plan_ends_at)}. ${lockMsg.body}`
+        : `Ended on ${fmtDate(status.plan_ends_at)}. Everything you've added is safe and paused until you renew.`;
       usageText = `${plural(status.docs_used, "document")} saved`;
     } else {
       planLocked = true;
