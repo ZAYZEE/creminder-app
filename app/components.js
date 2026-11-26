@@ -19,7 +19,7 @@ export function Badge({ status }) {
 
 // Loads the account status once and works out whether (and why) the account is locked
 export function useLock() {
-  const [state, setState] = useState({ status: null, lock: null });
+  const [state, setState] = useState({ status: null, lock: null, renewal: null });
   useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -31,7 +31,12 @@ export function useLock() {
         const r = await supabase.rpc("get_trial_deletion_date");
         deletionDate = r.data || null;
       }
-      setState({ status: st, lock: lockInfo(st, deletionDate) });
+      let renewal = null;
+      if (st && st.plan_active) {
+        const rv = await supabase.rpc("get_renewal_info");
+        renewal = rv.data && rv.data[0] ? rv.data[0] : null;
+      }
+      setState({ status: st, lock: lockInfo(st, deletionDate), renewal });
     })();
   }, []);
   return state;
@@ -40,7 +45,7 @@ export function useLock() {
 export function Shell({ children, title, subtitle }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { status, lock } = useLock();
+  const { status, lock, renewal } = useLock();
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
     { href: "/records", label: "Records", icon: Users },
@@ -63,7 +68,7 @@ export function Shell({ children, title, subtitle }) {
   const lockMsg = lockText(lock, status);
   const sidebarNote = !status || status.is_upgraded ? null
     : lockMsg ? lockMsg.short
-    : status.plan_active && new Date(status.plan_ends_at) <= Date.now() ? "Plan expired · grace period. Access continues for a short time."
+    : status.plan_active && new Date(status.plan_ends_at) <= Date.now() ? (renewal && renewal.has_queued ? "Your renewal starts shortly" : "Plan expired · grace period. Access continues for a short time.")
     : status.plan_active ? `${status.plan_name} plan · ${daysLeft(status.plan_ends_at)} day${daysLeft(status.plan_ends_at) !== 1 ? "s" : ""} left`
     : `${daysLeft(status.trial_ends_at)} day${daysLeft(status.trial_ends_at) !== 1 ? "s" : ""} left in trial`;
 
