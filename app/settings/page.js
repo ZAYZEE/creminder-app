@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Shell, useLock } from "../components";
 import { lockText } from "@/lib/lockInfo";
-import { PlusCircle, X, Users, Copy, Check, UserMinus, AlertTriangle } from "lucide-react";
+import { PlusCircle, X, Users, Copy, Check, UserMinus, AlertTriangle, Pencil } from "lucide-react";
 
 export default function Settings() {
   const router = useRouter();
@@ -12,6 +12,10 @@ export default function Settings() {
   const [email, setEmail] = useState("");
   const [orgId, setOrgId] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const [invites, setInvites] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
   const [members, setMembers] = useState([]);
@@ -77,6 +81,16 @@ export default function Settings() {
     navigator.clipboard.writeText(link);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const saveOrgName = async () => {
+    setNameError("");
+    setSavingName(true);
+    const { data, error } = await supabase.rpc("rename_organization", { p_name: nameDraft });
+    setSavingName(false);
+    if (error) { setNameError(error.message); return; }
+    setOrg((o) => ({ ...o, name: data }));
+    setEditingName(false);
   };
 
   const logout = async () => {
@@ -184,7 +198,28 @@ export default function Settings() {
         <div className="bg-white rounded-xl border p-5" style={{ borderColor: "#E4E2D8" }}>
           <h2 className="font-medium text-sm mb-4" style={{ color: "#16232E" }}>Account</h2>
           <div className="text-sm space-y-2" style={{ color: "#4B5563" }}>
-            <div className="flex justify-between"><span>Organization</span><span style={{ color: "#16232E" }}>{org?.name || "…"}</span></div>
+            {editingName ? (
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0">Organization</span>
+                  <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} maxLength={80} autoFocus
+                    className="flex-1 min-w-0 px-3 py-1.5 rounded-lg border text-sm" style={{ borderColor: "#E4E2D8", color: "#16232E" }} />
+                  <button onClick={saveOrgName} disabled={savingName} className="text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50" style={{ backgroundColor: "#16232E", color: "white" }}>{savingName ? "Saving…" : "Save"}</button>
+                  <button onClick={() => { setEditingName(false); setNameError(""); }} className="text-xs px-2 py-1.5" style={{ color: "#6B7280" }}>Cancel</button>
+                </div>
+                {nameError && <div className="text-xs mt-1" style={{ color: "#B3261E" }}>{nameError}</div>}
+              </div>
+            ) : (
+              <div className="flex justify-between items-center">
+                <span>Organization</span>
+                <span className="flex items-center gap-2" style={{ color: "#16232E" }}>
+                  {org?.name || "…"}
+                  {isOwner && !locked && (
+                    <button onClick={() => { setNameDraft(org?.name || ""); setNameError(""); setEditingName(true); }} className="text-gray-300 hover:text-gray-600 transition" title="Rename organization"><Pencil size={13} /></button>
+                  )}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between"><span>Email</span><span style={{ color: "#16232E" }}>{email}</span></div>
             <div className="flex justify-between"><span>Role</span><span style={{ color: "#16232E" }}>{isOwner ? "Owner" : "Member"}</span></div>
           </div>
